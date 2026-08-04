@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -9,14 +9,18 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Colors, FontSize, TouchSize, Spacing } from "@/components/tokens";
+import { LargeMicrophoneButton } from "@/components/LargeMicrophoneButton";
+import { ContactCandidateCard } from "@/components/ContactCandidateCard";
+import { ConfirmationPanel } from "@/components/ConfirmationPanel";
 import { searchContacts, dialContact } from "@/services/contactCallService";
-import { createMockContactsAdapter } from "@/features/contacts/MockContactsAdapter";
-import { createMockPhoneAdapter } from "@/features/calling/MockPhoneAdapter";
+import { createRealContactsAdapter } from "@/features/contacts/RealContactsAdapter";
+import { createRealPhoneAdapter } from "@/features/calling/RealPhoneAdapter";
+import { createMockSpeechAdapter } from "@/features/speech/MockSpeechAdapter";
 import type { ContactCandidate } from "@/domain/types";
 
-// Mock 모드: 실제 기기 연동 전까지 사용
-const contactsAdapter = createMockContactsAdapter();
-const phoneAdapter = createMockPhoneAdapter();
+const contactsAdapter = createRealContactsAdapter();
+const phoneAdapter = createRealPhoneAdapter();
+const speechAdapter = createMockSpeechAdapter();
 
 let requestCounter = 0;
 function nextRequestId(): string {
@@ -35,12 +39,15 @@ type ScreenState =
 export default function HomeScreen() {
   const [input, setInput] = useState("");
   const [screen, setScreen] = useState<ScreenState>({ type: "idle" });
+  const [isListening, setIsListening] = useState(false);
+  const inputRef = useRef<TextInput>(null);
 
-  async function handleSearch() {
-    if (!input.trim()) return;
+  async function handleSearch(utterance?: string) {
+    const query = (utterance ?? input).trim();
+    if (!query) return;
     setScreen({ type: "searching" });
 
-    const result = await searchContacts(input, contactsAdapter);
+    const result = await searchContacts(query, contactsAdapter);
     if (result.status === "permission_denied") {
       setScreen({ type: "permission_denied" });
     } else if (result.status === "no_results") {
@@ -54,8 +61,23 @@ export default function HomeScreen() {
     }
   }
 
-  async function handleDial(candidate: ContactCandidate, requestId: string) {
-    setScreen({ type: "confirming", candidate, requestId });
+  async function handleMicPress() {
+    if (isListening) {
+      await speechAdapter.stopListening();
+      setIsListening(false);
+      return;
+    }
+    setIsListening(true);
+    await speechAdapter.startListening(
+      (text) => {
+        setIsListening(false);
+        setInput(text);
+        handleSearch(text);
+      },
+      (_err) => {
+        setIsListening(false);
+      }
+    );
   }
 
   async function handleConfirm(candidate: ContactCandidate, requestId: string) {
@@ -73,17 +95,14 @@ export default function HomeScreen() {
         message: `${result.contactName} 님의 전화 화면을 열었어요.\n통화 버튼을 눌러 주세요.`,
       });
     } else if (result.status === "duplicate_blocked") {
-      setScreen({
-        type: "result",
-        message: "이미 전화 화면을 열었어요.",
-        isError: false,
-      });
+      setScreen({ type: "result", message: "이미 전화 화면을 열었어요." });
     } else {
       setScreen({
         type: "result",
-        message: result.status === "phone_not_found"
-          ? "전화번호를 찾을 수 없어요."
-          : (result as { status: "error"; message: string }).message,
+        message:
+          result.status === "phone_not_found"
+            ? "전화번호를 찾을 수 없어요."
+            : (result as { status: "error"; message: string }).message,
         isError: true,
       });
     }
@@ -91,41 +110,60 @@ export default function HomeScreen() {
 
   function handleReset() {
     setInput("");
+    setIsListening(false);
+    speechAdapter.stopListening();
     setScreen({ type: "idle" });
   }
 
+  const showIdle =
+    screen.type === "idle" ||
+    screen.type === "no_results" ||
+    screen.type === "permission_denied";
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* 홈 / 검색 영역 */}
-      {(screen.type === "idle" || screen.type === "no_results" || screen.type === "permission_denied") && (
+      {/* 홈 */}
+      {showIdle && (
         <View style={styles.section}>
           <Text style={styles.heading}>무엇을 도와드릴까요?</Text>
+
+          {/* 마이크 버튼 — 주 입력 */}
+          <LargeMicrophoneButton
+            isListening={isListening}
+            onPress={handleMicPress}
+          />
+
+          <Text style={styles.divider}>— 또는 직접 입력 —</Text>
+
+          {/* 텍스트 입력 — 보조 입력 */}
           <TextInput
+            ref={inputRef}
             style={styles.input}
             value={input}
             onChangeText={setInput}
             placeholder="예: 딸한테 전화해 줘"
             placeholderTextColor={Colors.placeholder}
-            multiline={false}
             returnKeyType="search"
-            onSubmitEditing={handleSearch}
+            onSubmitEditing={() => handleSearch()}
             accessibilityLabel="할 일 입력"
           />
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={handleSearch}
+            onPress={() => handleSearch()}
             accessibilityLabel="검색"
           >
             <Text style={styles.primaryButtonText}>실행하기</Text>
           </TouchableOpacity>
 
           {screen.type === "no_results" && (
-            <Text style={styles.infoText}>연락처에서 찾을 수 없었어요.</Text>
+            <Text style={styles.infoText}>
+              연락처에서 찾을 수 없었어요.{"\n"}이름을 다시 말해보세요.
+            </Text>
           )}
           {screen.type === "permission_denied" && (
             <Text style={styles.dangerText}>
               연락처 사용이 허용되지 않았어요.{"\n"}
-              글자로 번호를 직접 입력하거나 설정에서 허용할 수 있어요.
+              설정 → 앱 → AI 며느리 → 권한에서 허용해 주세요.
             </Text>
           )}
         </View>
@@ -144,15 +182,17 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={styles.heading}>누구에게 전화할까요?</Text>
           {screen.candidates.map((c) => (
-            <TouchableOpacity
+            <ContactCandidateCard
               key={c.id}
-              style={styles.candidateCard}
-              onPress={() => handleDial(c, screen.requestId)}
-              accessibilityLabel={`${c.name}에게 전화`}
-            >
-              <Text style={styles.candidateName}>{c.name}</Text>
-              <Text style={styles.candidateNumber}>{c.maskedNumber}</Text>
-            </TouchableOpacity>
+              candidate={c}
+              onPress={() =>
+                setScreen({
+                  type: "confirming",
+                  candidate: c,
+                  requestId: screen.requestId,
+                })
+              }
+            />
           ))}
           <TouchableOpacity style={styles.cancelButton} onPress={handleReset}>
             <Text style={styles.cancelButtonText}>취소할게요</Text>
@@ -163,26 +203,20 @@ export default function HomeScreen() {
       {/* 최종 확인 */}
       {screen.type === "confirming" && (
         <View style={styles.section}>
-          <Text style={styles.heading}>
-            {screen.candidate.name} 님에게{"\n"}지금 전화할까요?
-          </Text>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => handleConfirm(screen.candidate, screen.requestId)}
-            accessibilityLabel="전화 확인"
-          >
-            <Text style={styles.primaryButtonText}>전화할게요</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.cancelButton} onPress={handleReset}>
-            <Text style={styles.cancelButtonText}>전화하지 않을게요</Text>
-          </TouchableOpacity>
+          <ConfirmationPanel
+            candidate={screen.candidate}
+            onConfirm={() => handleConfirm(screen.candidate, screen.requestId)}
+            onCancel={handleReset}
+          />
         </View>
       )}
 
       {/* 결과 */}
       {screen.type === "result" && (
         <View style={styles.section}>
-          <Text style={screen.isError ? styles.dangerText : styles.successText}>
+          <Text
+            style={screen.isError ? styles.dangerText : styles.successText}
+          >
             {screen.message}
           </Text>
           <TouchableOpacity style={styles.cancelButton} onPress={handleReset}>
@@ -202,13 +236,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   section: {
-    gap: Spacing.md,
+    gap: Spacing.lg,
   },
   heading: {
-    fontSize: FontSize.heading,
+    fontSize: FontSize.headingLarge,
     fontWeight: "700",
     color: Colors.textPrimary,
-    lineHeight: 36,
+    lineHeight: 40,
+    textAlign: "center",
+  },
+  divider: {
+    textAlign: "center",
+    color: Colors.textMuted,
+    fontSize: FontSize.caption,
   },
   input: {
     borderWidth: 1,
@@ -249,35 +289,17 @@ const styles = StyleSheet.create({
     fontSize: FontSize.buttonLabel,
     fontWeight: "600",
   },
-  candidateCard: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.primaryBorder,
-    borderRadius: 12,
-    padding: Spacing.md,
-    minHeight: TouchSize.minimum,
-    justifyContent: "center",
-  },
-  candidateName: {
-    fontSize: FontSize.body,
-    fontWeight: "700",
-    color: Colors.textPrimary,
-  },
-  candidateNumber: {
-    fontSize: FontSize.caption,
-    color: Colors.textMuted,
-    marginTop: 4,
-  },
   infoText: {
     fontSize: FontSize.body,
     color: Colors.textSecondary,
     textAlign: "center",
+    lineHeight: 30,
   },
   successText: {
-    fontSize: FontSize.heading,
+    fontSize: FontSize.headingLarge,
     color: Colors.successText,
     fontWeight: "700",
-    lineHeight: 36,
+    lineHeight: 40,
     textAlign: "center",
   },
   dangerText: {

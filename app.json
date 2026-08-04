@@ -1,5 +1,18 @@
 {
-  "android": {
-    "package": "com.leejanghan.aimyeoneuri"
+  "expo": {
+    "name": "AI 며느리",
+    "slug": "ai-myeoneuri",
+    "version": "0.1.0",
+    "scheme": "aimyeoneuri",
+    "orientation": "portrait",
+    "android": {
+      "package": "com.leejanghan.aimyeoneuri",
+      "adaptiveIcon": {
+        "backgroundColor": "#12183F"
+      }
+    },
+    "plugins": [
+      "expo-router"
+    ]
   }
 }
