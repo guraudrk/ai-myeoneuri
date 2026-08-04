@@ -1,5 +1,4 @@
 import { TouchableOpacity, Text, StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { Colors, FontSize, TouchSize, Spacing, Shadow, Radius } from "./tokens";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
 
@@ -18,7 +17,7 @@ export function BusinessCandidateCard({ business, onPress }: Props) {
       accessibilityRole="button"
     >
       <View style={styles.iconBox}>
-        <Ionicons name="storefront-outline" size={26} color={Colors.primary} />
+        <Text style={styles.iconEmoji}>🏪</Text>
       </View>
       <View style={styles.info}>
         <View style={styles.nameRow}>
@@ -32,9 +31,7 @@ export function BusinessCandidateCard({ business, onPress }: Props) {
         <Text style={styles.category}>{business.category}</Text>
         <Text style={styles.address} numberOfLines={1}>{business.address}</Text>
       </View>
-      <View style={styles.arrow}>
-        <Text style={styles.arrowText}>›</Text>
-      </View>
+      <Text style={styles.arrow}>›</Text>
     </TouchableOpacity>
   );
 }
@@ -58,6 +55,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+  },
+  iconEmoji: {
+    fontSize: 24,
   },
   info: {
     flex: 1,
@@ -96,11 +96,9 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   arrow: {
-    flexShrink: 0,
-  },
-  arrowText: {
     fontSize: 28,
     color: Colors.textMuted,
     fontWeight: "300",
+    flexShrink: 0,
   },
 });

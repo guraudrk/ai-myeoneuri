@@ -8,7 +8,6 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { Colors, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
 import { LargeMicrophoneButton } from "@/components/LargeMicrophoneButton";
 import { ContactCandidateCard } from "@/components/ContactCandidateCard";
@@ -133,7 +132,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.root}>
 
-      {/* ── IDLE: 다크 히어로 + 라이트 입력 영역 ── */}
+      {/* ── IDLE: 다크 히어로 + 입력 시트 ── */}
       {isIdle && (
         <>
           <View style={styles.hero}>
@@ -154,7 +153,6 @@ export default function HomeScreen() {
             </View>
 
             <View style={[styles.inputWrapper, Shadow.card]}>
-              <Ionicons name="search-outline" size={22} color={Colors.textMuted} style={styles.searchIcon} />
               <TextInput
                 ref={inputRef}
                 style={styles.input}
@@ -178,13 +176,13 @@ export default function HomeScreen() {
 
             {screen.type === "no_results" && (
               <View style={styles.statusBox}>
-                <Ionicons name="search-outline" size={24} color={Colors.textMuted} />
+                <Text style={styles.statusEmoji}>🔍</Text>
                 <Text style={styles.statusText}>찾을 수 없었어요.{"\n"}다시 말씀해 주세요.</Text>
               </View>
             )}
             {screen.type === "permission_denied" && (
               <View style={[styles.statusBox, styles.statusBoxDanger]}>
-                <Ionicons name="lock-closed-outline" size={24} color={Colors.danger} />
+                <Text style={styles.statusEmoji}>🔒</Text>
                 <Text style={styles.dangerText}>
                   {screen.reason === "contacts"
                     ? "연락처 권한이 없어요.\n설정 → 앱 → AI 며느리 → 권한에서 허용해 주세요."
@@ -249,7 +247,7 @@ export default function HomeScreen() {
           {screen.type === "confirming_business" && (
             <View style={[styles.confirmCard, Shadow.card]}>
               <View style={styles.confirmIconBox}>
-                <Ionicons name="storefront" size={36} color={Colors.primary} />
+                <Text style={styles.confirmEmoji}>🏪</Text>
               </View>
               <Text style={styles.confirmName}>{screen.business.name}</Text>
               <Text style={styles.confirmSub}>{screen.business.address}</Text>
@@ -258,7 +256,7 @@ export default function HomeScreen() {
                 style={[styles.runButton, Shadow.button]}
                 onPress={() => handleConfirmBusiness(screen.business, screen.requestId)}
               >
-                <Ionicons name="call" size={22} color="#fff" />
+                <Text style={styles.runButtonEmoji}>📞</Text>
                 <Text style={styles.runButtonText}>전화할게요</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
@@ -269,11 +267,9 @@ export default function HomeScreen() {
 
           {screen.type === "result" && (
             <View style={[styles.resultCard, Shadow.card, screen.isError && styles.resultCardError]}>
-              <Ionicons
-                name={screen.isError ? "alert-circle-outline" : "checkmark-circle"}
-                size={52}
-                color={screen.isError ? Colors.danger : Colors.success}
-              />
+              <Text style={styles.resultEmoji}>
+                {screen.isError ? "⚠️" : "✅"}
+              </Text>
               <Text style={[styles.resultText, screen.isError && styles.resultTextError]}>
                 {screen.message}
               </Text>
@@ -283,7 +279,6 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* 취소 버튼 (후보 목록 상태) */}
           {(screen.type === "contact_candidates" || screen.type === "business_candidates") && (
             <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
               <Text style={styles.ghostButtonText}>취소할게요</Text>
@@ -302,8 +297,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-
-  // ── IDLE ──
   hero: {
     backgroundColor: Colors.navyDeep,
     paddingTop: 56,
@@ -315,10 +308,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   appBadge: {
-    fontSize: FontSize.label,
-    color: "rgba(255,255,255,0.5)",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.45)",
     fontWeight: "500",
-    letterSpacing: 1.5,
+    letterSpacing: 2,
     textTransform: "uppercase",
   },
   heroTitle: {
@@ -328,7 +321,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 44,
   },
-
   inputSheet: {
     flex: 0.45,
     backgroundColor: Colors.background,
@@ -348,7 +340,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
   },
   orText: {
-    fontSize: FontSize.label,
+    fontSize: 13,
     color: Colors.textMuted,
     fontWeight: "500",
     letterSpacing: 0.5,
@@ -356,16 +348,11 @@ const styles = StyleSheet.create({
   inputWrapper: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: Spacing.md,
     minHeight: TouchSize.minimum,
-  },
-  searchIcon: {
-    marginRight: Spacing.sm,
+    justifyContent: "center",
   },
   input: {
-    flex: 1,
     fontSize: FontSize.body,
     color: Colors.textPrimary,
     paddingVertical: Spacing.md,
@@ -379,6 +366,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: Spacing.xl,
+  },
+  runButtonEmoji: {
+    fontSize: 20,
   },
   runButtonText: {
     color: "#FFFFFF",
@@ -396,6 +386,9 @@ const styles = StyleSheet.create({
   statusBoxDanger: {
     backgroundColor: Colors.dangerBg,
   },
+  statusEmoji: {
+    fontSize: 22,
+  },
   statusText: {
     flex: 1,
     fontSize: FontSize.caption,
@@ -408,8 +401,6 @@ const styles = StyleSheet.create({
     color: Colors.danger,
     lineHeight: 24,
   },
-
-  // ── SEARCHING ──
   centerFull: {
     flex: 1,
     justifyContent: "center",
@@ -420,8 +411,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.body,
     color: Colors.textSecondary,
   },
-
-  // ── CONTENT (non-idle) ──
   contentFull: {
     flex: 1,
   },
@@ -435,8 +424,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
-
-  // ── CONFIRM BUSINESS ──
   confirmCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
@@ -452,6 +439,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: Spacing.sm,
+  },
+  confirmEmoji: {
+    fontSize: 34,
   },
   confirmName: {
     fontSize: FontSize.headingLarge,
@@ -469,8 +459,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: Spacing.md,
   },
-
-  // ── RESULT ──
   resultCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
@@ -480,6 +468,9 @@ const styles = StyleSheet.create({
   },
   resultCardError: {
     backgroundColor: Colors.dangerBg,
+  },
+  resultEmoji: {
+    fontSize: 52,
   },
   resultText: {
     fontSize: FontSize.heading,
@@ -491,8 +482,6 @@ const styles = StyleSheet.create({
   resultTextError: {
     color: Colors.danger,
   },
-
-  // ── GHOST BUTTON ──
   ghostButton: {
     minHeight: TouchSize.minimum,
     justifyContent: "center",

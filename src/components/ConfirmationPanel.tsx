@@ -1,5 +1,4 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { Colors, FontSize, TouchSize, Spacing, Shadow, Radius } from "./tokens";
 import type { ContactCandidate } from "@/domain/types";
 
@@ -27,7 +26,7 @@ export function ConfirmationPanel({ candidate, onConfirm, onCancel }: Props) {
         accessibilityLabel="전화 확인"
         accessibilityRole="button"
       >
-        <Ionicons name="call" size={22} color="#FFFFFF" />
+        <Text style={styles.confirmIcon}>📞</Text>
         <Text style={styles.confirmText}>전화할게요</Text>
       </TouchableOpacity>
 
@@ -87,6 +86,9 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: Spacing.xl,
     marginTop: Spacing.sm,
+  },
+  confirmIcon: {
+    fontSize: 20,
   },
   confirmText: {
     color: Colors.surface,

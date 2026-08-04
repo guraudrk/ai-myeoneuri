@@ -1,6 +1,5 @@
 import { useRef, useEffect } from "react";
 import { TouchableOpacity, Text, StyleSheet, View, Animated } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { Colors, TouchSize, Shadow } from "./tokens";
 
 interface Props {
@@ -10,6 +9,48 @@ interface Props {
 
 const SIZE = TouchSize.microphone;
 const GLOW = SIZE + 52;
+
+function MicIcon() {
+  return (
+    <View style={micStyles.wrapper}>
+      <View style={micStyles.capsule} />
+      <View style={micStyles.stand} />
+      <View style={micStyles.base} />
+    </View>
+  );
+}
+
+function StopIcon() {
+  return <View style={micStyles.stopSquare} />;
+}
+
+const micStyles = StyleSheet.create({
+  wrapper: { alignItems: "center", gap: 4 },
+  capsule: {
+    width: 24,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  stand: {
+    width: 2,
+    height: 14,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 1,
+  },
+  base: {
+    width: 32,
+    height: 2,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 1,
+  },
+  stopSquare: {
+    width: 26,
+    height: 26,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 4,
+  },
+});
 
 export function LargeMicrophoneButton({ isListening, onPress }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -56,11 +97,7 @@ export function LargeMicrophoneButton({ isListening, onPress }: Props) {
             accessibilityLabel={isListening ? "듣는 중, 탭하면 중지" : "말하기 버튼"}
             accessibilityRole="button"
           >
-            <Ionicons
-              name={isListening ? "stop-circle" : "mic"}
-              size={58}
-              color="#FFFFFF"
-            />
+            {isListening ? <StopIcon /> : <MicIcon />}
           </TouchableOpacity>
         </Animated.View>
       </View>
