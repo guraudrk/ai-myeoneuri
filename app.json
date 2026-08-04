@@ -12,7 +12,13 @@
       }
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "AI 며느리가 근처 업체를 찾기 위해 위치를 사용합니다."
+        }
+      ]
     ]
   }
 }
