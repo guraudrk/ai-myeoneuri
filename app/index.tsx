@@ -19,7 +19,7 @@ import { createRealContactsAdapter } from "@/features/contacts/RealContactsAdapt
 import { createRealPhoneAdapter } from "@/features/calling/RealPhoneAdapter";
 import { createRealLocationAdapter } from "@/features/location/RealLocationAdapter";
 import { createMockBusinessSearchAdapter } from "@/features/business/MockBusinessSearchAdapter";
-import { createMockSpeechAdapter } from "@/features/speech/MockSpeechAdapter";
+import { createRealSpeechAdapter } from "@/features/speech/RealSpeechAdapter";
 import { detectIntent, extractBusinessQuery } from "@/features/intent/intentParser";
 import type { ContactCandidate } from "@/domain/types";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
@@ -28,7 +28,7 @@ const contactsAdapter = createRealContactsAdapter();
 const phoneAdapter = createRealPhoneAdapter();
 const locationAdapter = createRealLocationAdapter();
 const businessAdapter = createMockBusinessSearchAdapter();
-const speechAdapter = createMockSpeechAdapter();
+const speechAdapter = createRealSpeechAdapter();
 
 let requestCounter = 0;
 function nextRequestId(): string {
