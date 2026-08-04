@@ -8,7 +8,8 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Colors, FontSize, TouchSize, Spacing } from "@/components/tokens";
+import { Ionicons } from "@expo/vector-icons";
+import { Colors, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
 import { LargeMicrophoneButton } from "@/components/LargeMicrophoneButton";
 import { ContactCandidateCard } from "@/components/ContactCandidateCard";
 import { ConfirmationPanel } from "@/components/ConfirmationPanel";
@@ -70,7 +71,6 @@ export default function HomeScreen() {
         setScreen({ type: "business_candidates", candidates: result.candidates, requestId: nextRequestId() });
       }
     } else {
-      // call_contact 또는 unknown → 연락처 시도
       const result = await searchContacts(query, contactsAdapter);
       if (result.status === "permission_denied") {
         setScreen({ type: "permission_denied", reason: "contacts" });
@@ -102,7 +102,7 @@ export default function HomeScreen() {
   async function handleConfirmContact(candidate: ContactCandidate, requestId: string) {
     const result = await dialContact(requestId, candidate.id, candidate.name, contactsAdapter, phoneAdapter);
     if (result.status === "dialer_opened") {
-      setScreen({ type: "result", message: `${result.contactName} 님의 전화 화면을 열었어요.\n통화 버튼을 눌러 주세요.` });
+      setScreen({ type: "result", message: `${result.contactName} 님께 전화 화면을 열었어요.\n통화 버튼을 눌러 주세요.` });
     } else if (result.status === "duplicate_blocked") {
       setScreen({ type: "result", message: "이미 전화 화면을 열었어요." });
     } else {
@@ -128,117 +128,380 @@ export default function HomeScreen() {
     setScreen({ type: "idle" });
   }
 
-  const showIdle = screen.type === "idle" || screen.type === "no_results" || screen.type === "permission_denied";
+  const isIdle = screen.type === "idle" || screen.type === "no_results" || screen.type === "permission_denied";
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <View style={styles.root}>
 
-      {/* 홈 */}
-      {showIdle && (
-        <View style={styles.section}>
-          <Text style={styles.heading}>무엇을 도와드릴까요?</Text>
-          <LargeMicrophoneButton isListening={isListening} onPress={handleMicPress} />
-          <Text style={styles.divider}>— 또는 직접 입력 —</Text>
-          <TextInput
-            ref={inputRef}
-            style={styles.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder={"예: 딸한테 전화해 줘\n    근처 보일러 수리공 찾아줘"}
-            placeholderTextColor={Colors.placeholder}
-            returnKeyType="search"
-            onSubmitEditing={() => handleSearch()}
-            accessibilityLabel="할 일 입력"
-          />
-          <TouchableOpacity style={styles.primaryButton} onPress={() => handleSearch()} accessibilityLabel="실행">
-            <Text style={styles.primaryButtonText}>실행하기</Text>
-          </TouchableOpacity>
+      {/* ── IDLE: 다크 히어로 + 라이트 입력 영역 ── */}
+      {isIdle && (
+        <>
+          <View style={styles.hero}>
+            <Text style={styles.appBadge}>AI 며느리</Text>
+            <Text style={styles.heroTitle}>무엇을{"\n"}도와드릴까요?</Text>
+            <LargeMicrophoneButton isListening={isListening} onPress={handleMicPress} />
+          </View>
 
-          {screen.type === "no_results" && (
-            <Text style={styles.infoText}>찾을 수 없었어요.{"\n"}다시 말씀해 주세요.</Text>
-          )}
-          {screen.type === "permission_denied" && screen.reason === "contacts" && (
-            <Text style={styles.dangerText}>연락처 권한이 없어요.{"\n"}설정 → 앱 → AI 며느리 → 권한에서 허용해 주세요.</Text>
-          )}
-          {screen.type === "permission_denied" && screen.reason === "location" && (
-            <Text style={styles.dangerText}>위치 권한이 없어요.{"\n"}설정 → 앱 → AI 며느리 → 권한에서 허용해 주세요.</Text>
-          )}
-        </View>
+          <ScrollView
+            style={styles.inputSheet}
+            contentContainerStyle={styles.inputSheetInner}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.orRow}>
+              <View style={styles.orLine} />
+              <Text style={styles.orText}>직접 입력</Text>
+              <View style={styles.orLine} />
+            </View>
+
+            <View style={[styles.inputWrapper, Shadow.card]}>
+              <Ionicons name="search-outline" size={22} color={Colors.textMuted} style={styles.searchIcon} />
+              <TextInput
+                ref={inputRef}
+                style={styles.input}
+                value={input}
+                onChangeText={setInput}
+                placeholder="예: 딸한테 전화해 줘 / 근처 병원 찾아줘"
+                placeholderTextColor={Colors.placeholder}
+                returnKeyType="search"
+                onSubmitEditing={() => handleSearch()}
+                accessibilityLabel="할 일 입력"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.runButton, Shadow.button]}
+              onPress={() => handleSearch()}
+              accessibilityLabel="실행"
+            >
+              <Text style={styles.runButtonText}>실행하기</Text>
+            </TouchableOpacity>
+
+            {screen.type === "no_results" && (
+              <View style={styles.statusBox}>
+                <Ionicons name="search-outline" size={24} color={Colors.textMuted} />
+                <Text style={styles.statusText}>찾을 수 없었어요.{"\n"}다시 말씀해 주세요.</Text>
+              </View>
+            )}
+            {screen.type === "permission_denied" && (
+              <View style={[styles.statusBox, styles.statusBoxDanger]}>
+                <Ionicons name="lock-closed-outline" size={24} color={Colors.danger} />
+                <Text style={styles.dangerText}>
+                  {screen.reason === "contacts"
+                    ? "연락처 권한이 없어요.\n설정 → 앱 → AI 며느리 → 권한에서 허용해 주세요."
+                    : "위치 권한이 없어요.\n설정 → 앱 → AI 며느리 → 권한에서 허용해 주세요."}
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </>
       )}
 
-      {/* 검색 중 */}
+      {/* ── 검색 중 ── */}
       {screen.type === "searching" && (
-        <View style={styles.section}>
+        <View style={styles.centerFull}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.infoText}>찾고 있어요…</Text>
+          <Text style={styles.searchingText}>찾고 있어요…</Text>
         </View>
       )}
 
-      {/* 연락처 후보 */}
-      {screen.type === "contact_candidates" && (
-        <View style={styles.section}>
-          <Text style={styles.heading}>누구에게 전화할까요?</Text>
-          {screen.candidates.map((c) => (
-            <ContactCandidateCard key={c.id} candidate={c} onPress={() => setScreen({ type: "confirming_contact", candidate: c, requestId: screen.requestId })} />
-          ))}
-          <TouchableOpacity style={styles.cancelButton} onPress={handleReset}><Text style={styles.cancelButtonText}>취소할게요</Text></TouchableOpacity>
-        </View>
+      {/* ── 비(非)아이들 콘텐츠 ── */}
+      {(screen.type === "contact_candidates" ||
+        screen.type === "business_candidates" ||
+        screen.type === "confirming_contact" ||
+        screen.type === "confirming_business" ||
+        screen.type === "result") && (
+        <ScrollView style={styles.contentFull} contentContainerStyle={styles.contentInner}>
+
+          {screen.type === "contact_candidates" && (
+            <>
+              <Text style={styles.sectionTitle}>누구에게 전화할까요?</Text>
+              {screen.candidates.map((c) => (
+                <ContactCandidateCard
+                  key={c.id}
+                  candidate={c}
+                  onPress={() => setScreen({ type: "confirming_contact", candidate: c, requestId: screen.requestId })}
+                />
+              ))}
+            </>
+          )}
+
+          {screen.type === "business_candidates" && (
+            <>
+              <Text style={styles.sectionTitle}>어디에 전화할까요?</Text>
+              {screen.candidates.map((b) => (
+                <BusinessCandidateCard
+                  key={b.id}
+                  business={b}
+                  onPress={() => setScreen({ type: "confirming_business", business: b, requestId: screen.requestId })}
+                />
+              ))}
+            </>
+          )}
+
+          {screen.type === "confirming_contact" && (
+            <ConfirmationPanel
+              candidate={screen.candidate}
+              onConfirm={() => handleConfirmContact(screen.candidate, screen.requestId)}
+              onCancel={handleReset}
+            />
+          )}
+
+          {screen.type === "confirming_business" && (
+            <View style={[styles.confirmCard, Shadow.card]}>
+              <View style={styles.confirmIconBox}>
+                <Ionicons name="storefront" size={36} color={Colors.primary} />
+              </View>
+              <Text style={styles.confirmName}>{screen.business.name}</Text>
+              <Text style={styles.confirmSub}>{screen.business.address}</Text>
+              <Text style={styles.confirmQuestion}>지금 전화할까요?</Text>
+              <TouchableOpacity
+                style={[styles.runButton, Shadow.button]}
+                onPress={() => handleConfirmBusiness(screen.business, screen.requestId)}
+              >
+                <Ionicons name="call" size={22} color="#fff" />
+                <Text style={styles.runButtonText}>전화할게요</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
+                <Text style={styles.ghostButtonText}>전화하지 않을게요</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {screen.type === "result" && (
+            <View style={[styles.resultCard, Shadow.card, screen.isError && styles.resultCardError]}>
+              <Ionicons
+                name={screen.isError ? "alert-circle-outline" : "checkmark-circle"}
+                size={52}
+                color={screen.isError ? Colors.danger : Colors.success}
+              />
+              <Text style={[styles.resultText, screen.isError && styles.resultTextError]}>
+                {screen.message}
+              </Text>
+              <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
+                <Text style={styles.ghostButtonText}>홈으로 돌아가기</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* 취소 버튼 (후보 목록 상태) */}
+          {(screen.type === "contact_candidates" || screen.type === "business_candidates") && (
+            <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
+              <Text style={styles.ghostButtonText}>취소할게요</Text>
+            </TouchableOpacity>
+          )}
+
+        </ScrollView>
       )}
 
-      {/* 업체 후보 */}
-      {screen.type === "business_candidates" && (
-        <View style={styles.section}>
-          <Text style={styles.heading}>어디에 전화할까요?</Text>
-          {screen.candidates.map((b) => (
-            <BusinessCandidateCard key={b.id} business={b} onPress={() => setScreen({ type: "confirming_business", business: b, requestId: screen.requestId })} />
-          ))}
-          <TouchableOpacity style={styles.cancelButton} onPress={handleReset}><Text style={styles.cancelButtonText}>취소할게요</Text></TouchableOpacity>
-        </View>
-      )}
-
-      {/* 연락처 확인 */}
-      {screen.type === "confirming_contact" && (
-        <View style={styles.section}>
-          <ConfirmationPanel candidate={screen.candidate} onConfirm={() => handleConfirmContact(screen.candidate, screen.requestId)} onCancel={handleReset} />
-        </View>
-      )}
-
-      {/* 업체 확인 */}
-      {screen.type === "confirming_business" && (
-        <View style={styles.section}>
-          <Text style={styles.heading}>{screen.business.name}에{"\n"}지금 전화할까요?</Text>
-          <Text style={styles.infoText}>{screen.business.address}</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => handleConfirmBusiness(screen.business, screen.requestId)} accessibilityLabel="전화 확인">
-            <Text style={styles.primaryButtonText}>전화할게요</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.cancelButton} onPress={handleReset}>
-            <Text style={styles.cancelButtonText}>전화하지 않을게요</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* 결과 */}
-      {screen.type === "result" && (
-        <View style={styles.section}>
-          <Text style={screen.isError ? styles.dangerText : styles.successText}>{screen.message}</Text>
-          <TouchableOpacity style={styles.cancelButton} onPress={handleReset}><Text style={styles.cancelButtonText}>홈으로 돌아가기</Text></TouchableOpacity>
-        </View>
-      )}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: Colors.background, padding: Spacing.lg, justifyContent: "center" },
-  section: { gap: Spacing.lg },
-  heading: { fontSize: FontSize.headingLarge, fontWeight: "700", color: Colors.textPrimary, lineHeight: 40, textAlign: "center" },
-  divider: { textAlign: "center", color: Colors.textMuted, fontSize: FontSize.caption },
-  input: { borderWidth: 1, borderColor: Colors.border, borderRadius: 12, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: FontSize.body, color: Colors.textPrimary, backgroundColor: Colors.surface, minHeight: TouchSize.minimum },
-  primaryButton: { backgroundColor: Colors.primary, borderRadius: 12, minHeight: TouchSize.minimum, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl },
-  primaryButtonText: { color: Colors.surface, fontSize: FontSize.buttonLabel, fontWeight: "700" },
-  cancelButton: { borderWidth: 1, borderColor: Colors.border, borderRadius: 12, minHeight: TouchSize.minimum, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl, backgroundColor: Colors.surface },
-  cancelButtonText: { color: Colors.textSecondary, fontSize: FontSize.buttonLabel, fontWeight: "600" },
-  infoText: { fontSize: FontSize.body, color: Colors.textSecondary, textAlign: "center", lineHeight: 30 },
-  successText: { fontSize: FontSize.headingLarge, color: Colors.successText, fontWeight: "700", lineHeight: 40, textAlign: "center" },
-  dangerText: { fontSize: FontSize.body, color: Colors.danger, textAlign: "center", lineHeight: 30 },
+  root: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+
+  // ── IDLE ──
+  hero: {
+    backgroundColor: Colors.navyDeep,
+    paddingTop: 56,
+    paddingBottom: 40,
+    paddingHorizontal: Spacing.xl,
+    alignItems: "center",
+    gap: Spacing.lg,
+    flex: 0.55,
+    justifyContent: "center",
+  },
+  appBadge: {
+    fontSize: FontSize.label,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "500",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textAlign: "center",
+    lineHeight: 44,
+  },
+
+  inputSheet: {
+    flex: 0.45,
+    backgroundColor: Colors.background,
+  },
+  inputSheetInner: {
+    padding: Spacing.xl,
+    gap: Spacing.lg,
+  },
+  orRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  orText: {
+    fontSize: FontSize.label,
+    color: Colors.textMuted,
+    fontWeight: "500",
+    letterSpacing: 0.5,
+  },
+  inputWrapper: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    minHeight: TouchSize.minimum,
+  },
+  searchIcon: {
+    marginRight: Spacing.sm,
+  },
+  input: {
+    flex: 1,
+    fontSize: FontSize.body,
+    color: Colors.textPrimary,
+    paddingVertical: Spacing.md,
+  },
+  runButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.pill,
+    minHeight: TouchSize.minimum,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: Spacing.xl,
+  },
+  runButtonText: {
+    color: "#FFFFFF",
+    fontSize: FontSize.buttonLabel,
+    fontWeight: "700",
+  },
+  statusBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+  },
+  statusBoxDanger: {
+    backgroundColor: Colors.dangerBg,
+  },
+  statusText: {
+    flex: 1,
+    fontSize: FontSize.caption,
+    color: Colors.textSecondary,
+    lineHeight: 24,
+  },
+  dangerText: {
+    flex: 1,
+    fontSize: FontSize.caption,
+    color: Colors.danger,
+    lineHeight: 24,
+  },
+
+  // ── SEARCHING ──
+  centerFull: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: Spacing.lg,
+  },
+  searchingText: {
+    fontSize: FontSize.body,
+    color: Colors.textSecondary,
+  },
+
+  // ── CONTENT (non-idle) ──
+  contentFull: {
+    flex: 1,
+  },
+  contentInner: {
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: FontSize.heading,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+  },
+
+  // ── CONFIRM BUSINESS ──
+  confirmCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  confirmIconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.primaryTint,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.sm,
+  },
+  confirmName: {
+    fontSize: FontSize.headingLarge,
+    fontWeight: "700",
+    color: Colors.textPrimary,
+    textAlign: "center",
+  },
+  confirmSub: {
+    fontSize: FontSize.caption,
+    color: Colors.textMuted,
+    textAlign: "center",
+  },
+  confirmQuestion: {
+    fontSize: FontSize.body,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
+  },
+
+  // ── RESULT ──
+  resultCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  resultCardError: {
+    backgroundColor: Colors.dangerBg,
+  },
+  resultText: {
+    fontSize: FontSize.heading,
+    fontWeight: "700",
+    color: Colors.successText,
+    textAlign: "center",
+    lineHeight: 36,
+  },
+  resultTextError: {
+    color: Colors.danger,
+  },
+
+  // ── GHOST BUTTON ──
+  ghostButton: {
+    minHeight: TouchSize.minimum,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: Spacing.xl,
+  },
+  ghostButtonText: {
+    fontSize: FontSize.body,
+    color: Colors.textMuted,
+    fontWeight: "500",
+  },
 });

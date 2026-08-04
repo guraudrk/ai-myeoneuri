@@ -1,50 +1,70 @@
-/** SilverLink Blue·Navy Design Token */
 export const Colors = {
-  background: "#F5F7FB",
+  background: "#F0F4F8",
   surface: "#FFFFFF",
-  surfaceAlt: "#EEF2FF",
-  border: "#E7EBF3",
+  border: "#E2E8F0",
 
-  textPrimary: "#101828",
-  textSecondary: "#475467",
-  textStrong: "#344054",
-  textMuted: "#667085",
-  placeholder: "#98A2B3",
+  textPrimary: "#0F172A",
+  textSecondary: "#475569",
+  textStrong: "#1E293B",
+  textMuted: "#94A3B8",
+  placeholder: "#CBD5E1",
 
-  primary: "#2E5BFF",
-  primaryPressed: "#234AE0",
-  primaryTint: "#EEF2FF",
-  primaryBorder: "#DCE4FF",
+  primary: "#2563EB",
+  primaryPressed: "#1D4ED8",
+  primaryTint: "#EFF6FF",
+  primaryBorder: "#BFDBFE",
 
-  navyDeep: "#12183F",
+  navyDeep: "#0F1F4B",
   navyMid: "#1B2660",
-  accentBlue: "#5B8CFF",
 
-  success: "#12B76A",
-  successBg: "#ECFDF3",
-  successText: "#087443",
+  success: "#10B981",
+  successBg: "#ECFDF5",
+  successText: "#065F46",
 
-  warning: "#F79009",
-  warningBg: "#FFFAEB",
+  warning: "#F59E0B",
+  warningBg: "#FFFBEB",
 
-  danger: "#F04438",
-  dangerBg: "#FEF3F2",
-  dangerBorder: "#FECDCA",
+  danger: "#EF4444",
+  dangerBg: "#FEF2F2",
+  dangerBorder: "#FECACA",
 } as const;
 
-/** 접근성 기준 폰트 크기 */
+export const Shadow = {
+  card: {
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  button: {
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  mic: {
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+} as const;
+
 export const FontSize = {
   body: 20,
   heading: 24,
   headingLarge: 28,
   buttonLabel: 20,
   caption: 16,
+  label: 14,
 } as const;
 
-/** 터치 영역 최소 크기 (dp) */
 export const TouchSize = {
   minimum: 56,
-  microphone: 148,
+  microphone: 144,
 } as const;
 
 export const Spacing = {
@@ -54,4 +74,11 @@ export const Spacing = {
   lg: 24,
   xl: 32,
   xxl: 48,
+} as const;
+
+export const Radius = {
+  sm: 10,
+  md: 14,
+  lg: 18,
+  pill: 100,
 } as const;
