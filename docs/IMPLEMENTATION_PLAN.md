@@ -65,9 +65,9 @@ Objective:
 - [x] DONE — 화면 결과 안내 ("이지은 님의 전화 화면을 열었어요. 통화 버튼을 눌러 주세요.")
 - [x] DONE — Unit/Integration Test (28 tests, 전부 통과)
 - [x] DONE — Type-check (tsc --noEmit 0 오류)
-- [ ] READY — Lint (ESLint 미실행)
+- [x] DONE — Lint (ESLint 0 오류)
 - [ ] READY — Expo Doctor
-- [ ] READY — Android Build (expo prebuild 후 가능)
+- [x] DONE — Android Build (expo prebuild → assembleDebug 성공, app-debug.apk 124 MB)
 - [ ] DEFERRED — 실제 기기 QA 체크리스트
 - [ ] READY — README/Decision/Plan 갱신 (진행 중)
 
@@ -105,15 +105,13 @@ Objective:
 
 ## Blockers
 
-- 없음. 다음 단계는 ESLint 설정 + Expo prebuild + 실제 Android 빌드 확인.
+- 없음.
 
 ## Next action
 
-1. ESLint 실행 및 오류 수정
-2. `expo prebuild` 실행 (Android 프로젝트 생성)
-3. `./gradlew assembleDebug` Android Debug Build
-4. 마이크 버튼 컴포넌트 추가 (Speech Input 인터페이스)
-5. 실제 기기 QA 체크리스트 작성
+1. 마이크 버튼 컴포넌트 추가 (LargeMicrophoneButton + SpeechInputAdapter 인터페이스 + Mock)
+2. 컴포넌트 분리 (ContactCandidateCard, ConfirmationPanel, PermissionExplanation)
+3. 실제 기기 QA 체크리스트 작성 및 APK 설치 테스트
 
 ## Stack confirmed
 
