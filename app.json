@@ -18,13 +18,6 @@
         {
           "locationWhenInUsePermission": "AI 며느리가 근처 업체를 찾기 위해 위치를 사용합니다."
         }
-      ],
-      [
-        "expo-speech-recognition",
-        {
-          "microphonePermission": "AI 며느리가 음성 명령을 인식하기 위해 마이크를 사용합니다.",
-          "speechRecognitionPermission": "AI 며느리가 말씀하신 내용을 텍스트로 변환하기 위해 음성 인식을 사용합니다."
-        }
       ]
     ]
   }
