@@ -1,0 +1,50 @@
+[GENERAL FIRST PROMPT FOR AN AI CODING AGENT]
+
+프로젝트 루트의 지침 파일과
+`docs/AGENT_OPERATING_MANUAL.md`를 읽어라.
+
+다음 순서로 현재 프로젝트를 조사하라.
+
+1. Git status와 최근 변경
+2. 프로젝트 구조와 주요 진입점
+3. 현재 Product/Requirement 문서
+4. Architecture와 Decision 기록
+5. Implementation Plan
+6. 실제 구현 상태
+7. 테스트와 빌드 상태
+
+그다음 사용자의 현재 목표를 다음 형식의 Task Contract로 정리하라.
+
+- Objective
+- Success criteria
+- In scope
+- Out of scope
+- Constraints
+- Risk level
+- Likely files
+- Validation
+- Approval gates
+- Stop conditions
+
+현재 목표를 달성하기 위한
+우선순위 Task Queue를 작성하라.
+
+가장 작은 검증 가능한 Vertical Slice부터 선택하고,
+낮은 위험이면 계획 → 실행 → 검증 → 기록을 진행하라.
+
+중간 이상 위험, 파괴적 변경, Production 작업,
+유료 외부 호출, 인증 변경은 먼저 계획과 영향을 보고하고 승인받아라.
+
+이미 완료된 기능은 다시 만들지 마라.
+현재 목표와 관계없는 개선은 Backlog에 기록하라.
+
+최종 보고 형식:
+
+[Objective]
+[Result]
+[Changed]
+[Evidence]
+[Decisions]
+[Known limitations]
+[Next]
+[Approval needed]

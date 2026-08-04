@@ -1,0 +1,32 @@
+[START HERE]
+
+처음 이 ZIP을 열었다면 다음 순서로 읽으세요.
+
+1. `BEGINNER_PROJECT_SETUP_GUIDE.txt`
+   - 프로젝트에 문서를 설치하고 처음 실행하는 방법
+
+2. `GENERAL_AI_CODING_AGENT_OPERATING_MANUAL_GUIDE.txt`
+   - 전체 방법론을 사람이 이해하기 위한 해설
+
+3. `GENERAL_AI_CODING_AGENT_OPERATING_MANUAL.txt`
+   - AI 코딩 에이전트가 실제로 따라야 하는 범용 운영 규칙
+
+4. `GENERAL_CLAUDE_MD_TEMPLATE.txt`
+   - 프로젝트 루트의 CLAUDE.md 작성용 템플릿
+
+5. `GENERAL_FIRST_PROMPT_TEMPLATE.txt`
+   - Claude Code 첫 실행 시 입력할 메시지
+
+6. `GENERAL_WORKFLOW_TEMPLATE.txt`
+   - 반복 업무를 Workflow로 문서화할 때 사용하는 양식
+
+빠른 시작:
+
+- 프로젝트에 `docs/AGENT_OPERATING_MANUAL.md`로 운영 매뉴얼을 복사
+- 루트에 CLAUDE.md 생성
+- Product Spec, Implementation Plan, Decisions 최소 문서 작성
+- Claude Code 실행
+- First Prompt 입력
+- 현재 상태 분석과 첫 Vertical Slice 계획 확인
+
+Secret이나 API Key는 이 문서나 Claude 채팅에 입력하지 마세요.

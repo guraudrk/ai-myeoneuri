@@ -1,0 +1,77 @@
+# GENERAL CLAUDE.md TEMPLATE
+
+## Project overview
+
+- Project:
+- Purpose:
+- Tech stack:
+- Package manager:
+- Main entry points:
+
+## Source of truth
+
+- Product requirements:
+- Architecture:
+- Implementation plan:
+- Decisions:
+- Agent operating manual:
+- Domain knowledge:
+
+## Required workflow
+
+For multi-step work:
+
+1. Read the relevant source-of-truth documents.
+2. Inspect the current repository and Git status.
+3. Define objective, scope, constraints, validation, and stop conditions.
+4. Plan the smallest runnable slice.
+5. Implement with minimal unrelated changes.
+6. Run risk-appropriate validation.
+7. Review the diff.
+8. Update plan and decisions when necessary.
+9. Report evidence and next priority.
+
+Read the full operating manual only for multi-step, architectural, risky, or autonomous work.
+
+## Engineering rules
+
+- Follow existing project patterns.
+- Use strict typing where available.
+- Validate external inputs.
+- Keep secrets server-side.
+- Do not silently discard user data.
+- Add tests for regressions.
+- Do not add dependencies without a reason.
+- Do not change public behavior without updating requirements and tests.
+
+## Security
+
+- Never commit secrets.
+- Never print credentials or tokens.
+- Use least privilege.
+- Require approval for destructive data changes, production actions, and paid high-volume API calls.
+
+## Validation commands
+
+- Install:
+- Type-check:
+- Lint:
+- Unit:
+- Integration:
+- E2E:
+- Build:
+
+## Approval required
+
+- Destructive migration
+- Production deployment
+- Authentication redesign
+- User-data deletion
+- Paid external calls beyond the agreed budget
+- Large refactor
+- Scope expansion
+
+## Completion rule
+
+Do not claim completion without evidence.
+List tests run, failures, limitations, and remaining work.

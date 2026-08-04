@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;background:#E7EBF3;font-family:'Inter',system-ui,sans-serif;}
+  @keyframes micPulse{0%{transform:scale(1);opacity:.35}70%{transform:scale(1.9);opacity:0}100%{transform:scale(1.9);opacity:0}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes barBounce{0%,100%{height:10px}50%{height:28px}}
+  @media (prefers-reduced-motion: reduce){
+    .pulse-ring, .spin, .bar{animation:none !important;}
+  }
+</style>
+</helmet>
+<div style="display:flex;gap:40px;padding:40px;align-items:flex-start;flex-wrap:wrap;min-height:100vh;box-sizing:border-box;">
+
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" hint-size="412px,892px">
+  <div style="width:100%;height:100%;background:#F5F7FB;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;position:relative;">
+
+    <sc-if value="{{ is.backVisible }}" hint-placeholder-val="{{ false }}">
+      <button aria-label="{{ backLabel }}" onClick="{{ goBack }}" style="position:absolute;top:16px;left:16px;z-index:5;width:48px;height:48px;border-radius:24px;border:none;background:#FFFFFF;box-shadow:0 2px 10px rgba(18,24,63,0.12);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="#101828" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </sc-if>
+
+    <sc-if value="{{ is.splash }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center;gap:20px;">
+        <div style="width:72px;height:72px;border-radius:20px;background:#2E5BFF;"></div>
+        <div style="font-size:26px;font-weight:600;color:#101828;line-height:1.4;">말씀만 하시면<br/>제가 도와드릴게요</div>
+        <div style="font-size:20px;color:#475467;line-height:1.5;">전화, 검색 같은 일을&nbsp;대신 처리해 드려요</div>
+        <button onClick="{{ go_onboard_intro }}" style="margin-top:16px;width:100%;max-width:320px;height:64px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:24px;font-weight:600;cursor:pointer;">시작할게요</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.onboard_intro }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:32px 28px;box-sizing:border-box;">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;">
+          <div style="font-size:26px;font-weight:600;color:#101828;line-height:1.4;">이 앱은 이렇게 도와드려요</div>
+          <div style="font-size:20px;color:#475467;line-height:1.6;">"딸한테 전화해 줘"처럼 편하게 말씀하시면, 제가 확인 후 실행해 드려요.</div>
+          <sc-if value="{{ state.introMore }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:18px;color:#667085;line-height:1.6;background:#EEF2FF;border-radius:14px;padding:16px;animation:fadeUp .25s ease;">실행 전에는 항상 화면과 음성으로 다시 한번 확인해 드리고, 언제든 취소하실 수 있어요.</div>
+          </sc-if>
+          <button onClick="{{ toggleIntroMore }}" style="align-self:flex-start;background:none;border:none;color:#2E5BFF;font-size:18px;font-weight:600;padding:8px 0;cursor:pointer;">자세히 보기</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button onClick="{{ finish_onboarding }}" style="height:64px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:22px;font-weight:600;cursor:pointer;">시작할게요</button>
+          <button onClick="{{ goHome_fromSplash }}" style="height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#475467;font-size:20px;font-weight:500;cursor:pointer;">나중에 할게요</button>
+          <div style="text-align:center;font-size:17px;color:#667085;padding-top:4px;">권한은 필요한 기능을 처음 사용할 때 이유를 먼저 알려드린 뒤 요청해요</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.onboard_mic }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:32px 28px;box-sizing:border-box;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:18px;align-items:center;text-align:center;padding-top:24px;">
+          <div style="width:88px;height:88px;border-radius:44px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;">
+            <div style="width:26px;height:40px;border-radius:13px;background:#2E5BFF;"></div>
+          </div>
+          <div style="font-size:24px;font-weight:600;color:#101828;">마이크 사용 권한</div>
+          <div style="font-size:20px;color:#475467;line-height:1.6;">"딸에게 전화해 줘"라고 말씀하실 때<br/>목소리를 듣기 위해 필요해요.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button onClick="{{ allow_mic_permission }}" style="height:64px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:22px;font-weight:600;cursor:pointer;">마이크를 허용할게요</button>
+          <button onClick="{{ deny_onboard_mic }}" style="height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#475467;font-size:20px;font-weight:500;cursor:pointer;">마이크 없이 계속할게요</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.onboard_contacts }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:32px 28px;box-sizing:border-box;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:18px;align-items:center;text-align:center;padding-top:24px;">
+          <div style="width:88px;height:88px;border-radius:44px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;">
+            <div style="width:36px;height:36px;border-radius:18px;background:#2E5BFF;"></div>
+          </div>
+          <div style="font-size:24px;font-weight:600;color:#101828;">연락처 사용 권한</div>
+          <div style="font-size:20px;color:#475467;line-height:1.6;">"딸에게 전화해 줘"라고 말씀하셨을 때<br/>연락처에서 딸을 찾기 위해 필요해요.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button onClick="{{ allow_contacts_permission }}" style="height:64px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:22px;font-weight:600;cursor:pointer;">연락처를 허용할게요</button>
+          <button onClick="{{ deny_onboard_contacts }}" style="height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#475467;font-size:20px;font-weight:500;cursor:pointer;">연락처 없이 계속할게요</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.onboard_call }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:32px 28px;box-sizing:border-box;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:18px;align-items:center;text-align:center;padding-top:24px;">
+          <div style="width:88px;height:88px;border-radius:44px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;">
+            <div style="width:34px;height:34px;border-radius:10px;background:#2E5BFF;transform:rotate(45deg);"></div>
+          </div>
+          <div style="font-size:24px;font-weight:600;color:#101828;">전화 화면 열기 안내</div>
+          <div style="font-size:20px;color:#475467;line-height:1.6;">확인하신 뒤 안드로이드 전화 화면을 열어요.<br/>마지막 통화 버튼은 직접 눌러 주세요.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button onClick="{{ finish_onboarding }}" style="height:64px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:22px;font-weight:600;cursor:pointer;">이해했어요</button>
+          <button onClick="{{ finish_onboarding }}" style="height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#475467;font-size:20px;font-weight:500;cursor:pointer;">홈으로 갈게요</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.onboard_notif }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:32px 28px;box-sizing:border-box;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:18px;align-items:center;text-align:center;padding-top:24px;">
+          <div style="width:88px;height:88px;border-radius:44px;background:#EEF2FF;display:flex;align-items:center;justify-content:center;">
+            <div style="width:30px;height:30px;border-radius:15px;border:6px solid #2E5BFF;"></div>
+          </div>
+          <div style="font-size:24px;font-weight:600;color:#101828;">알림 권한</div>
+          <div style="font-size:20px;color:#475467;line-height:1.6;">알림을 처음 만들 때만<br/>필요한 이유를 설명하고 요청해요.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button onClick="{{ finish_onboarding }}" style="height:64px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:22px;font-weight:600;cursor:pointer;">알림을 허용할게요</button>
+          <button onClick="{{ deny_onboard_notif }}" style="height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#475467;font-size:20px;font-weight:500;cursor:pointer;">다음에 할게요</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.permission_denied_onboard }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:32px 28px;box-sizing:border-box;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;padding-top:32px;">
+          <div style="width:80px;height:80px;border-radius:40px;background:#FEF3F2;display:flex;align-items:center;justify-content:center;">
+            <div style="width:6px;height:30px;border-radius:3px;background:#B42318;"></div>
+          </div>
+          <div style="font-size:24px;font-weight:600;color:#101828;">권한이 허용되지 않았어요</div>
+          <div style="font-size:20px;color:#475467;line-height:1.6;">이 기능은 지금 사용하지 않을게요.<br/>다른 방법으로 계속할 수 있어요.</div>
+        </div>
+        <button onClick="{{ continueAfterDenied }}" style="height:64px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:22px;font-weight:600;cursor:pointer;">다른 방법으로 계속할게요</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.home }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:24px 24px 20px;box-sizing:border-box;overflow:auto;">
+        <div style="display:flex;justify-content:flex-end;">
+          <button onClick="{{ go_settings }}" aria-label="설정 열기" style="height:44px;padding:0 16px;border-radius:22px;border:2px solid #E7EBF3;background:#fff;color:#475467;font-size:17px;font-weight:600;cursor:pointer;">설정</button>
+        </div>
+        <div style="text-align:center;font-size:26px;font-weight:600;color:#101828;margin-top:8px;font-size:{{ sizes.home }}px;">무엇을 도와드릴까요?</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:14px;margin:28px 0 20px;">
+          <button onClick="{{ go_listening }}" aria-label="말씀하시려면 누르세요" style="width:148px;height:148px;border-radius:74px;border:none;background:#2E5BFF;box-shadow:0 8px 24px rgba(46,91,255,0.28);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+            <div style="width:34px;height:52px;border-radius:17px;background:#fff;"></div>
+          </button>
+          <div style="font-size:{{ sizes.homeSub }}px;color:#475467;font-weight:500;">눌러서 말씀하세요</div>
+          <button onClick="{{ go_text_input }}" style="font-size:19px;color:#2E5BFF;font-weight:600;background:none;border:none;padding:10px;cursor:pointer;">글자로 입력할게요</button>
+        </div>
+        <div style="font-size:19px;font-weight:600;color:#101828;margin-bottom:10px;">최근 요청</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <button onClick="{{ go_recent }}" style="text-align:left;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;border:1px solid #E7EBF3;background:#fff;cursor:pointer;">
+            <div style="width:10px;height:10px;border-radius:5px;background:#087443;flex-shrink:0;"></div>
+            <div style="flex:1;font-size:18px;color:#101828;">딸 전화 화면 열기 · 완료</div>
+          </button>
+          <button onClick="{{ go_recent }}" style="text-align:left;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;border:1px solid #E7EBF3;background:#fff;cursor:pointer;">
+            <div style="width:10px;height:10px;border-radius:5px;background:#667085;flex-shrink:0;"></div>
+            <div style="flex:1;font-size:18px;color:#101828;">보일러 수리공 검색 · 취소함</div>
+          </button>
+        </div>
+        <div style="flex:1;"></div>
+        <button onClick="{{ go_guardian_help }}" style="margin-top:20px;height:60px;border:none;border-radius:18px;background:#F0F3F9;color:#1B2660;font-size:20px;font-weight:600;cursor:pointer;">보호자에게 도움 요청</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.listening }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:80px 28px 32px;box-sizing:border-box;text-align:center;">
+        <div style="font-size:22px;font-weight:600;color:#101828;">지금 듣고 있어요</div>
+        <div style="position:relative;width:160px;height:160px;display:flex;align-items:center;justify-content:center;">
+          <div class="pulse-ring" style="position:absolute;inset:0;border-radius:80px;background:#2E5BFF;animation:micPulse 1.8s ease-out infinite;"></div>
+          <div class="pulse-ring" style="position:absolute;inset:0;border-radius:80px;background:#2E5BFF;animation:micPulse 1.8s ease-out infinite;animation-delay:.6s;"></div>
+          <div style="width:120px;height:120px;border-radius:60px;background:#2E5BFF;display:flex;align-items:center;justify-content:center;z-index:1;">
+            <div style="width:28px;height:44px;border-radius:14px;background:#fff;"></div>
+          </div>
+        </div>
+        <div style="min-height:64px;display:flex;align-items:center;">
+          <div style="font-size:24px;font-weight:600;color:#101828;">{{ partialTranscript }}</div>
+        </div>
+        <div style="font-size:17px;color:#667085;">주변이 시끄러우면 마이크에 가까이 말씀해 주세요</div>
+        <button onClick="{{ go_home_cancel }}" style="width:100%;max-width:320px;height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#475467;font-size:20px;font-weight:600;cursor:pointer;">중지할게요</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.transcript_confirm }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 28px 32px;box-sizing:border-box;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;">
+          <div style="font-size:18px;color:#667085;">이렇게 들었어요</div>
+          <div style="font-size:28px;font-weight:700;color:#101828;line-height:1.5;background:#EEF2FF;border-radius:20px;padding:24px;">"딸한테 전화해 줘"</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button onClick="{{ go_candidates }}" style="height:64px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:22px;font-weight:600;cursor:pointer;">맞아요</button>
+          <button onClick="{{ go_listening }}" style="height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#475467;font-size:20px;font-weight:600;cursor:pointer;">다시 말할게요</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.candidates }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 24px 28px;box-sizing:border-box;">
+        <sc-if value="{{ state.searching }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;">
+            <div class="spin" style="width:44px;height:44px;border-radius:22px;border:5px solid #E7EBF3;border-top-color:#2E5BFF;animation:spin 0.9s linear infinite;"></div>
+            <div style="font-size:20px;color:#475467;">연락처에서 "딸"을 찾고 있어요</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ notSearching }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:22px;font-weight:600;color:#101828;text-align:center;margin-bottom:18px;">누구에게 전화할까요?</div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <button onClick="{{ pick_candidate_1 }}" style="text-align:left;display:flex;align-items:center;gap:16px;padding:18px;border-radius:20px;border:2px solid #E7EBF3;background:#fff;cursor:pointer;min-height:88px;">
+              <div style="width:52px;height:52px;border-radius:26px;background:#EEF2FF;flex-shrink:0;"></div>
+              <div style="flex:1;">
+                <div style="font-size:22px;font-weight:600;color:#101828;">이지은 · 딸</div>
+                <div style="font-size:17px;color:#667085;">010-1234-••••</div>
+              </div>
+            </button>
+            <button onClick="{{ pick_candidate_2 }}" style="text-align:left;display:flex;align-items:center;gap:16px;padding:18px;border-radius:20px;border:2px solid #E7EBF3;background:#fff;cursor:pointer;min-height:88px;">
+              <div style="width:52px;height:52px;border-radius:26px;background:#EEF2FF;flex-shrink:0;"></div>
+              <div style="flex:1;">
+                <div style="font-size:22px;font-weight:600;color:#101828;">이지은 · 회사 동료</div>
+                <div style="font-size:17px;color:#667085;">010-5678-••••</div>
+              </div>
+            </button>
+          </div>
+          <div style="flex:1;"></div>
+          <button onClick="{{ go_listening }}" style="height:56px;border:none;background:none;color:#475467;font-size:18px;font-weight:600;cursor:pointer;">다른 이름으로 찾을게요</button>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.candidates_none }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 28px 32px;box-sizing:border-box;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center;padding-top:16px;">
+          <div style="width:76px;height:76px;border-radius:38px;background:#EEF2FF;"></div>
+          <div style="font-size:23px;font-weight:600;color:#101828;">"딸"이라는 연락처를 찾지 못했어요</div>
+          <div style="font-size:19px;color:#475467;line-height:1.6;">다른 이름으로 다시 말씀하시거나<br/>보호자에게 도움을 요청할 수 있어요</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button onClick="{{ go_listening }}" style="height:60px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:21px;font-weight:600;cursor:pointer;">다른 이름으로 찾기</button>
+          <button onClick="{{ go_guardian_help }}" style="height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#101828;font-size:20px;font-weight:600;cursor:pointer;">보호자에게 도움 요청</button>
+          <button onClick="{{ go_home_cancel }}" style="height:52px;border:none;background:none;color:#475467;font-size:18px;font-weight:600;cursor:pointer;">연락처 앱 열기</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.final_confirm }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 28px 32px;box-sizing:border-box;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;">
+          <div style="width:64px;height:64px;border-radius:32px;background:#EEF2FF;margin-bottom:8px;"></div>
+          <div style="font-size:{{ sizes.confirm }}px;font-weight:700;color:#101828;line-height:1.5;">{{ state.candidateRel }} {{ state.candidateName }} 님의<br/>전화 화면을 열까요?</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button onClick="{{ do_call }}" style="height:64px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:22px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;">
+            <div style="width:20px;height:20px;border-radius:10px;background:#fff;"></div>전화 화면 열게요
+          </button>
+          <button onClick="{{ cancel_call }}" style="height:60px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#101828;font-size:20px;font-weight:600;cursor:pointer;">열지 않을게요</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.calling }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:32px;text-align:center;">
+        <div class="spin" style="width:56px;height:56px;border-radius:28px;border:6px solid #EEF2FF;border-top-color:#2E5BFF;animation:spin 0.9s linear infinite;"></div>
+        <div style="font-size:23px;font-weight:600;color:#101828;">{{ state.candidateName }} 님의 전화 화면을 열고 있어요</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.result_success }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 28px 32px;box-sizing:border-box;justify-content:space-between;align-items:center;text-align:center;">
+        <div style="display:flex;flex-direction:column;gap:16px;align-items:center;padding-top:24px;">
+          <div style="width:80px;height:80px;border-radius:40px;background:#ECFDF3;display:flex;align-items:center;justify-content:center;">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#087443" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="font-size:24px;font-weight:600;color:#101828;">{{ state.candidateName }} 님의<br/>전화 화면을 열었어요</div>
+          <div style="font-size:19px;color:#475467;line-height:1.6;">통화 버튼을 눌러 전화를 시작해 주세요</div>
+        </div>
+        <button onClick="{{ go_home_cancel }}" style="width:100%;height:60px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:21px;font-weight:600;cursor:pointer;">홈으로</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.result_cancelled }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 28px 32px;box-sizing:border-box;justify-content:space-between;align-items:center;text-align:center;">
+        <div style="display:flex;flex-direction:column;gap:16px;align-items:center;padding-top:24px;">
+          <div style="width:80px;height:80px;border-radius:40px;background:#EEF2FF;"></div>
+          <div style="font-size:24px;font-weight:600;color:#101828;">전화 화면을 열지 않았어요</div>
+          <div style="font-size:19px;color:#475467;">필요하실 때 다시 말씀해 주세요</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;width:100%;">
+          <button onClick="{{ go_candidates }}" style="height:60px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:21px;font-weight:600;cursor:pointer;">다시 선택할게요</button>
+          <button onClick="{{ go_home_cancel }}" style="height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#101828;font-size:19px;font-weight:600;cursor:pointer;">홈으로</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.result_permission_denied }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 28px 32px;box-sizing:border-box;justify-content:space-between;align-items:center;text-align:center;">
+        <div style="display:flex;flex-direction:column;gap:16px;align-items:center;padding-top:24px;">
+          <div style="width:80px;height:80px;border-radius:40px;background:#FEF3F2;display:flex;align-items:center;justify-content:center;">
+            <div style="width:6px;height:30px;border-radius:3px;background:#B42318;"></div>
+          </div>
+          <div style="font-size:22px;font-weight:600;color:#101828;line-height:1.5;">연락처 권한이 없어서<br/>대상을 찾을 수 없었어요</div>
+          <div style="font-size:19px;color:#475467;line-height:1.6;">설정에서 연락처 권한을 허용하거나 글자로 입력해 주세요</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;width:100%;">
+          <button onClick="{{ go_settings }}" style="height:60px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:20px;font-weight:600;cursor:pointer;">설정으로 이동</button>
+          <button onClick="{{ go_text_input }}" style="height:56px;border:2px solid #DCE4FF;border-radius:18px;background:#EEF2FF;color:#1B2660;font-size:19px;font-weight:600;cursor:pointer;">글자로 입력할게요</button>
+          <button onClick="{{ go_home_cancel }}" style="height:52px;border:none;background:none;color:#475467;font-size:18px;font-weight:600;cursor:pointer;">홈으로</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.result_error }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 28px 32px;box-sizing:border-box;justify-content:space-between;align-items:center;text-align:center;">
+        <div style="display:flex;flex-direction:column;gap:16px;align-items:center;padding-top:16px;">
+          <div style="width:80px;height:80px;border-radius:40px;background:#FEF3F2;display:flex;align-items:center;justify-content:center;">
+            <div style="width:6px;height:30px;border-radius:3px;background:#B42318;"></div>
+          </div>
+          <div style="font-size:21px;font-weight:600;color:#101828;line-height:1.5;">{{ errorMessage }}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px;">
+            <button onClick="{{ setErr_offline }}" style="padding:8px 14px;border-radius:14px;border:1px solid #E7EBF3;background:#fff;font-size:15px;color:#667085;cursor:pointer;">오프라인</button>
+            <button onClick="{{ setErr_duplicate }}" style="padding:8px 14px;border-radius:14px;border:1px solid #E7EBF3;background:#fff;font-size:15px;color:#667085;cursor:pointer;">중복 요청</button>
+            <button onClick="{{ setErr_timeout }}" style="padding:8px 14px;border-radius:14px;border:1px solid #E7EBF3;background:#fff;font-size:15px;color:#667085;cursor:pointer;">시간 초과</button>
+            <button onClick="{{ setErr_unknown }}" style="padding:8px 14px;border-radius:14px;border:1px solid #E7EBF3;background:#fff;font-size:15px;color:#667085;cursor:pointer;">알 수 없음</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;width:100%;">
+          <button onClick="{{ errorPrimaryAction }}" style="height:60px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:20px;font-weight:600;cursor:pointer;">{{ errorPrimaryLabel }}</button>
+          <button onClick="{{ go_home_cancel }}" style="height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#101828;font-size:19px;font-weight:600;cursor:pointer;">홈으로</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.recent }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 24px 28px;box-sizing:border-box;overflow:auto;">
+        <div style="font-size:23px;font-weight:600;color:#101828;margin-bottom:18px;">최근 요청</div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="padding:16px;border-radius:16px;border:1px solid #E7EBF3;background:#fff;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-size:19px;font-weight:600;color:#101828;">딸 전화 화면 열기</div>
+              <div style="font-size:15px;font-weight:600;color:#087443;background:#ECFDF3;padding:4px 10px;border-radius:10px;">완료</div>
+            </div>
+            <div style="font-size:16px;color:#667085;margin-top:4px;">오늘 오전 9:12 · 이지은</div>
+          </div>
+          <div style="padding:16px;border-radius:16px;border:1px solid #E7EBF3;background:#fff;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-size:19px;font-weight:600;color:#101828;">보일러 수리공 검색</div>
+              <div style="font-size:15px;font-weight:600;color:#475467;background:#EEF2FF;padding:4px 10px;border-radius:10px;">취소함</div>
+            </div>
+            <div style="font-size:16px;color:#667085;margin-top:4px;">어제 오후 3:40</div>
+          </div>
+          <div style="padding:16px;border-radius:16px;border:1px solid #E7EBF3;background:#fff;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-size:19px;font-weight:600;color:#101828;">관리사무소 전화 알림</div>
+              <div style="font-size:15px;font-weight:600;color:#087443;background:#ECFDF3;padding:4px 10px;border-radius:10px;">저장됨</div>
+            </div>
+            <div style="font-size:16px;color:#667085;margin-top:4px;">2일 전 오후 5:02</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.settings }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 24px 28px;box-sizing:border-box;overflow:auto;gap:22px;">
+        <div style="font-size:23px;font-weight:600;color:#101828;">설정</div>
+
+        <div>
+          <div style="font-size:18px;font-weight:600;color:#475467;margin-bottom:10px;">글자 크기</div>
+          <div style="display:flex;gap:10px;">
+            <button onClick="{{ setScaleNormal }}" style="flex:1;height:52px;border-radius:14px;border:2px solid {{ scaleNormalBorder }};background:{{ scaleNormalBg }};color:#101828;font-size:18px;font-weight:600;cursor:pointer;">보통</button>
+            <button onClick="{{ setScaleLarge }}" style="flex:1;height:52px;border-radius:14px;border:2px solid {{ scaleLargeBorder }};background:{{ scaleLargeBg }};color:#101828;font-size:18px;font-weight:600;cursor:pointer;">크게</button>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:18px;font-weight:600;color:#475467;margin-bottom:10px;">음성 속도</div>
+          <div style="display:flex;gap:10px;">
+            <button onClick="{{ setSpeedSlow }}" style="flex:1;height:48px;border-radius:14px;border:2px solid {{ speedSlowBorder }};background:{{ speedSlowBg }};color:#101828;font-size:16px;font-weight:600;cursor:pointer;">느리게</button>
+            <button onClick="{{ setSpeedNormal }}" style="flex:1;height:48px;border-radius:14px;border:2px solid {{ speedNormalBorder }};background:{{ speedNormalBg }};color:#101828;font-size:16px;font-weight:600;cursor:pointer;">보통</button>
+            <button onClick="{{ setSpeedFast }}" style="flex:1;height:48px;border-radius:14px;border:2px solid {{ speedFastBorder }};background:{{ speedFastBg }};color:#101828;font-size:16px;font-weight:600;cursor:pointer;">빠르게</button>
+          </div>
+        </div>
+
+        <button onClick="{{ go_guardian_help }}" style="text-align:left;padding:16px;border-radius:16px;border:1px solid #E7EBF3;background:#fff;cursor:pointer;">
+          <div style="font-size:18px;font-weight:600;color:#101828;">보호자 연결</div>
+          <div style="font-size:16px;color:#667085;margin-top:3px;">{{ guardianStatusText }}</div>
+        </button>
+
+        <div>
+          <div style="font-size:18px;font-weight:600;color:#475467;margin-bottom:10px;">권한 상태</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:#fff;border:1px solid #E7EBF3;">
+              <div style="font-size:17px;color:#101828;">마이크</div>
+              <div style="font-size:14px;font-weight:600;color:{{ micPermissionColor }};background:{{ micPermissionBg }};padding:4px 10px;border-radius:10px;">{{ micPermissionText }}</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:#fff;border:1px solid #E7EBF3;">
+              <div style="font-size:17px;color:#101828;">연락처</div>
+              <div style="font-size:14px;font-weight:600;color:{{ contactsPermissionColor }};background:{{ contactsPermissionBg }};padding:4px 10px;border-radius:10px;">{{ contactsPermissionText }}</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:#fff;border:1px solid #E7EBF3;">
+              <div style="font-size:17px;color:#101828;">전화</div>
+              <div style="font-size:14px;font-weight:600;color:#1B2660;background:#F0F3F9;padding:4px 10px;border-radius:10px;">권한 필요 없음</div>
+            </div>
+          </div>
+          <div style="font-size:15px;color:#667085;margin-top:6px;">마이크와 연락처는 해당 기능을 처음 사용할 때 요청해요. 전화 화면 열기는 별도 전화 권한이 필요 없어요.</div>
+        </div>
+
+        <button onClick="{{ go_recent }}" style="text-align:left;padding:16px;border-radius:16px;border:1px solid #E7EBF3;background:#fff;font-size:18px;font-weight:600;color:#101828;cursor:pointer;">최근 실행 기록 보기</button>
+
+        <button style="text-align:left;padding:16px;border-radius:16px;border:1px solid #E7EBF3;background:#fff;font-size:18px;font-weight:600;color:#B42318;cursor:pointer;">긴급 중지 / 접근성 기능 해제</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.guardian_connect }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 28px 32px;box-sizing:border-box;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;padding-top:16px;">
+          <div style="width:76px;height:76px;border-radius:38px;background:#F0F3F9;"></div>
+          <div style="font-size:23px;font-weight:600;color:#101828;">연결된 보호자가 없어요</div>
+          <div style="font-size:19px;color:#475467;line-height:1.6;">가족이나 보호자를 연결하면<br/>필요할 때 도움을 요청할 수 있어요</div>
+        </div>
+        <button onClick="{{ connectGuardian }}" style="height:60px;border:none;border-radius:18px;background:#1B2660;color:#fff;font-size:21px;font-weight:600;cursor:pointer;">가족 연락처 추가하기</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ is.guardian_help }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;padding:80px 28px 32px;box-sizing:border-box;justify-content:space-between;">
+        <sc-if value="{{ state.guardianSent }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;">
+            <div style="width:76px;height:76px;border-radius:38px;background:#ECFDF3;display:flex;align-items:center;justify-content:center;">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#087443" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div style="font-size:22px;font-weight:600;color:#101828;">보호자에게 전달했어요</div>
+          </div>
+          <button onClick="{{ go_home_cancel }}" style="height:60px;border:none;border-radius:18px;background:#2E5BFF;color:#fff;font-size:20px;font-weight:600;cursor:pointer;">홈으로</button>
+        </sc-if>
+        <sc-if value="{{ notGuardianSent }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div style="font-size:22px;font-weight:600;color:#101828;text-align:center;">무엇을 도와달라고 할까요?</div>
+            <div style="font-size:19px;color:#101828;line-height:1.6;background:#EEF2FF;border-radius:18px;padding:18px;">"연락처에서 딸을 찾지 못했어요. 확인해 주세요."</div>
+            <div style="font-size:16px;color:#667085;text-align:center;">이지은(딸)님에게 전달돼요</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <button onClick="{{ sendGuardianRequest }}" style="height:60px;border:none;border-radius:18px;background:#1B2660;color:#fff;font-size:20px;font-weight:600;cursor:pointer;">보내기</button>
+            <button onClick="{{ go_home_cancel }}" style="height:56px;border:2px solid #E7EBF3;border-radius:18px;background:#fff;color:#101828;font-size:19px;font-weight:600;cursor:pointer;">취소할게요</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+  </div>
+</x-import>
+
+<div style="width:380px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(18,24,63,0.08);max-height:892px;overflow:auto;box-sizing:border-box;">
+  <div style="font-size:13px;font-weight:700;letter-spacing:.04em;color:#667085;text-transform:uppercase;margin-bottom:6px;">개발 전달용 · 현재 화면</div>
+  <div style="font-size:20px;font-weight:700;color:#101828;margin-bottom:14px;">{{ info.name }}</div>
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+    <div><div style="font-size:13px;font-weight:600;color:#667085;">목적</div><div style="font-size:15px;color:#101828;line-height:1.5;">{{ info.purpose }}</div></div>
+    <div><div style="font-size:13px;font-weight:600;color:#667085;">TTS로 읽을 문장</div><div style="font-size:15px;color:#101828;line-height:1.5;">"{{ info.tts }}"</div></div>
+    <div><div style="font-size:13px;font-weight:600;color:#667085;">Android 뒤로가기</div><div style="font-size:15px;color:#101828;line-height:1.5;">{{ info.back }}</div></div>
+    <div><div style="font-size:13px;font-weight:600;color:#667085;">접근성 label</div><div style="font-size:15px;color:#101828;line-height:1.5;">{{ info.a11y }}</div></div>
+  </div>
+  <div style="font-size:13px;font-weight:700;letter-spacing:.04em;color:#667085;text-transform:uppercase;margin-bottom:10px;">화면 전체 보기 (검수용)</div>
+  <sc-for list="{{ groups }}" as="grp" hint-placeholder-count="4">
+    <div style="margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:700;color:#2E5BFF;margin-bottom:6px;">{{ grp.label }}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        <sc-for list="{{ grp.items }}" as="scr" hint-placeholder-count="3">
+          <button onClick="{{ scr.onClick }}" style="padding:8px 12px;border-radius:10px;border:1px solid {{ scr.border }};background:{{ scr.bg }};color:{{ scr.color }};font-size:13px;font-weight:600;cursor:pointer;">{{ scr.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+</div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const SCREEN_INFO = {
+  splash: { name:'시작 화면', purpose:'앱이 무엇을 도와주는지 한 문장으로 전달', tts:'말씀만 하시면 제가 도와드릴게요', back:'뒤로가기 시 OS 기본 동작', a11y:'"시작할게요" 버튼, 역할 button' },
+  onboard_intro:{ name:'온보딩 · 소개', purpose:'앱 사용 방식을 한 화면에 하나씩 설명', tts:'딸한테 전화해 줘처럼 편하게 말씀하시면 제가 확인 후 실행해 드려요', back:'뒤로가기 비활성(첫 단계)', a11y:'"시작할게요"/"나중에 할게요" 버튼 구분 label' },
+  onboard_mic:{ name:'필요 시 권한 · 마이크', purpose:'사용자가 마이크 기능을 처음 누른 순간에만 권한 이유를 설명', tts:'딸에게 전화해 줘라고 말씀하실 때 목소리를 듣기 위해 필요해요', back:'home으로 이동하며 음성 요청 취소', a11y:'"마이크를 허용할게요" 기본 포커스' },
+  onboard_contacts:{ name:'필요 시 권한 · 연락처', purpose:'연락처 검색 직전에만 사용 맥락과 권한 이유를 설명', tts:'딸에게 전화해 줘라고 말씀하셨을 때 연락처에서 딸을 찾기 위해 필요해요', back:'transcript_confirm으로 이동', a11y:'"연락처를 허용할게요" 기본 포커스' },
+  onboard_call:{ name:'전화 화면 열기 안내', purpose:'MVP는 ACTION_DIAL로 전화 화면만 열며 CALL_PHONE 권한이 필요 없음을 설명', tts:'확인하신 뒤 전화 화면을 열어요. 마지막 통화 버튼은 직접 눌러 주세요', back:'home으로 이동', a11y:'"이해했어요" 기본 포커스' },
+  onboard_notif:{ name:'필요 시 권한 · 알림', purpose:'첫 알림 생성 시점에만 권한을 요청하는 향후 Flow C 화면', tts:'알림을 처음 만들 때 필요한 이유를 알려드리고 요청할게요', back:'home으로 이동', a11y:'"알림을 허용할게요" 기본 포커스' },
+  permission_denied_onboard:{ name:'권한 거부 · 대체 경로', purpose:'거부를 존중하고 글자 입력 또는 홈으로 안전하게 돌아가는 경로 제공', tts:'이 기능은 지금 사용하지 않을게요. 다른 방법으로 계속할 수 있어요', back:'거부 직전 단계로 이동', a11y:'"다른 방법으로 계속할게요" 버튼 하나만 노출' },
+  home:{ name:'홈 화면', purpose:'핵심 진입점 — 마이크·최근 요청·보호자 도움·설정 노출, 메뉴 최소화', tts:'무엇을 도와드릴까요?', back:'앱 종료(OS 기본 동작)', a11y:'중앙 마이크 버튼 label "말씀하시려면 누르세요"' },
+  listening:{ name:'음성 듣는 중', purpose:'현재 녹음이 아니라 명령을 듣고 있음을 시각+문구로 명확히 표현', tts:'지금 듣고 있어요', back:'홈으로(요청 취소)', a11y:'"중지할게요" 버튼, 진행 상태 aria-live' },
+  transcript_confirm:{ name:'인식 결과 확인', purpose:'AI가 임의로 실행하기 전에 인식 문장을 사용자가 확인', tts:'딸한테 전화해 줘, 이렇게 들었어요', back:'listening으로 이동', a11y:'"맞아요"/"다시 말할게요" 명확히 구분된 label' },
+  candidates:{ name:'연락처 후보', purpose:'최대 2~3개 후보를 큰 선택 영역으로 제시, 전화번호는 일부 마스킹', tts:'딸로 저장된 이지은 님과 회사 동료 이지은 님이 있어요. 누구에게 전화할까요?', back:'transcript_confirm으로 이동', a11y:'카드 전체가 버튼, "이름 · 관계, 전화번호 일부" 순으로 읽힘' },
+  candidates_none:{ name:'연락처를 찾지 못한 상태', purpose:'실패 시 다음 행동(재시도/보호자 요청/직접 열기) 제시', tts:'딸이라는 연락처를 찾지 못했어요', back:'transcript_confirm으로 이동', a11y:'"다른 이름으로 찾기" 기본 포커스' },
+  final_confirm:{ name:'전화 화면 열기 최종 확인', purpose:'대상·행동·시점을 한 문장으로 확인시키는 가장 중요한 안전 화면', tts:'딸 이지은 님의 전화 화면을 지금 열까요?', back:'candidates로 이동', a11y:'"전화 화면 열게요"는 filled+아이콘, "열지 않을게요"는 outline로 색상 외 구분' },
+  calling:{ name:'전화 화면 여는 중', purpose:'Android Dialer handoff 직전의 짧은 상태를 표시하며 아직 handoff 전이면 취소 가능', tts:'이지은 님의 전화 화면을 열고 있어요', back:'handoff 전에는 final_confirm으로 돌아가 취소', a11y:'진행 상태 aria-live="polite"' },
+  result_success:{ name:'전화 화면 열림', purpose:'Dialer가 열렸다는 사실만 정확히 안내하고 실제 통화 시작을 추정하지 않음', tts:'이지은 님의 전화 화면을 열었어요. 통화 버튼을 눌러 주세요', back:'home으로 이동', a11y:'완료 아이콘은 장식(aria-hidden), 문구가 핵심 정보' },
+  result_cancelled:{ name:'전화 화면 열기 취소', purpose:'사용자의 취소를 존중하며 Dialer를 열지 않았음을 정확히 안내', tts:'전화 화면을 열지 않았어요. 필요하실 때 다시 선택해 주세요', back:'home으로 이동', a11y:'"다시 선택할게요"/"홈으로" 구분' },
+  result_permission_denied:{ name:'연락처 권한 거부 상태', purpose:'연락처 검색 권한 부재를 설명하고 설정 또는 글자 입력 경로 제시', tts:'연락처 권한이 없어 대상을 찾지 못했어요. 설정에서 허용하거나 글자로 입력해 주세요', back:'home으로 이동', a11y:'"설정으로 이동" 기본 포커스, "글자로 입력할게요" 대체 경로 제공' },
+  result_error:{ name:'오류 상태', purpose:'오프라인/중복 요청/시간 초과/알 수 없음 등 실행기 오류를 다음 행동 중심으로 안내', tts:'{{동적 오류 문구}}', back:'home으로 이동', a11y:'오류 문구는 원인이 아닌 다음 행동 중심' },
+  recent:{ name:'최근 요청', purpose:'최근 실행 기록과 상태(완료/취소/저장됨)를 확인', tts:'최근 요청 목록이에요', back:'home으로 이동', a11y:'각 행 "요청명, 상태, 시각" 순으로 읽힘' },
+  settings:{ name:'설정', purpose:'글자 크기·음성 속도·보호자 연결·권한 상태를 얕은 계층으로 노출', tts:'설정 화면이에요', back:'home으로 이동', a11y:'글자 크기 토글은 라디오 그룹 역할' },
+  guardian_connect:{ name:'보호자 연결 유도', purpose:'보호자가 연결되지 않은 상태에서 연결을 유도', tts:'연결된 보호자가 없어요', back:'settings로 이동', a11y:'"가족 연락처 추가하기" 기본 포커스' },
+  guardian_help:{ name:'보호자 도움 요청', purpose:'무엇을 요청할지 요약을 보여주고 전송 전 확인', tts:'무엇을 도와달라고 할까요?', back:'home으로 이동', a11y:'전송 전 요약 문구를 먼저 읽어 줌' },
+};
+
+const GROUPS = [
+  { label:'시작 · 필요 시 권한 안내', keys:['splash','onboard_intro','onboard_mic','onboard_contacts','onboard_call','onboard_notif','permission_denied_onboard'] },
+  { label:'핵심 흐름 A · 딸에게 전화', keys:['home','listening','transcript_confirm','candidates','candidates_none','final_confirm','calling','result_success','result_cancelled','result_permission_denied','result_error'] },
+  { label:'기타', keys:['recent','settings','guardian_connect','guardian_help'] },
+];
+
+class Component extends DCLogic {
+  state = {
+    screen: 'splash',
+    introMore: false,
+    textScale: 'normal',
+    speechSpeed: 'normal',
+    guardianConnected: false,
+    guardianSent: false,
+    micGranted: false,
+    contactsGranted: false,
+    permissionContext: 'home',
+    searching: true,
+    candidateName: '이지은',
+    candidateRel: '딸',
+    errorKind: 'offline',
+    deniedFrom: 'onboard_intro',
+    partialTranscript: '',
+  };
+
+  clearTimers(){ if(this._t) clearTimeout(this._t); if(this._t2) clearTimeout(this._t2); }
+  componentWillUnmount(){ this.clearTimers(); }
+
+  go = (screen) => {
+    this.clearTimers();
+    const extra = {};
+    if (screen === 'listening') extra.partialTranscript = '';
+    if (screen === 'candidates') extra.searching = true;
+    this.setState({ screen, ...extra });
+    if (screen === 'listening') {
+      this._t = setTimeout(() => this.setState({ partialTranscript: '딸한테' }), 500);
+      this._t2 = setTimeout(() => this.setState({ partialTranscript: '딸한테 전화해 줘' }), 1200);
+    }
+    if (screen === 'candidates') {
+      this._t = setTimeout(() => this.setState({ searching: false }), 900);
+    }
+    if (screen === 'calling') {
+      this._t = setTimeout(() => this.go('result_success'), 1700);
+    }
+  };
+
+  toggleIntroMore = () => this.setState(s => ({ introMore: !s.introMore }));
+  goHome_fromSplash = () => this.go('home');
+  go_onboard_intro = () => this.go('onboard_intro');
+  go_onboard_mic = () => this.go('onboard_mic');
+  go_onboard_contacts = () => this.go('onboard_contacts');
+  go_onboard_call = () => this.go('onboard_call');
+  go_onboard_notif = () => this.go('onboard_notif');
+  finish_onboarding = () => this.go('home');
+  allow_mic_permission = () => { this.setState({ micGranted:true }); this.go(this.state.permissionContext === 'listening' ? 'listening' : 'home'); };
+  allow_contacts_permission = () => { this.setState({ contactsGranted:true }); this.go(this.state.permissionContext === 'candidates' ? 'candidates' : 'home'); };
+  deny_onboard_mic = () => { this.setState({ deniedFrom: 'onboard_mic' }); this.go('permission_denied_onboard'); };
+  deny_onboard_contacts = () => { this.setState({ deniedFrom: 'onboard_contacts' }); this.go('permission_denied_onboard'); };
+  deny_onboard_call = () => { this.setState({ deniedFrom: 'onboard_call' }); this.go('permission_denied_onboard'); };
+  deny_onboard_notif = () => { this.setState({ deniedFrom: 'onboard_notif' }); this.go('permission_denied_onboard'); };
+  continueAfterDenied = () => {
+    if (this.state.deniedFrom === 'onboard_contacts') this.go('result_permission_denied');
+    else this.go('home');
+  };
+
+  go_home_cancel = () => this.go('home');
+  go_listening = () => {
+    if (!this.state.micGranted) { this.setState({ permissionContext:'listening' }); this.go('onboard_mic'); }
+    else this.go('listening');
+  };
+  go_text_input = () => this.go('transcript_confirm');
+  go_candidates = () => {
+    if (!this.state.contactsGranted) { this.setState({ permissionContext:'candidates' }); this.go('onboard_contacts'); }
+    else this.go('candidates');
+  };
+  go_recent = () => this.go('recent');
+  go_settings = () => this.go('settings');
+  go_guardian_help = () => this.go(this.state.guardianConnected ? 'guardian_help' : 'guardian_connect');
+
+  pick_candidate_1 = () => { this.setState({ candidateName:'이지은', candidateRel:'딸' }); this.go('final_confirm'); };
+  pick_candidate_2 = () => { this.setState({ candidateName:'이지은', candidateRel:'회사 동료' }); this.go('final_confirm'); };
+  do_call = () => this.go('calling');
+  cancel_call = () => this.go('result_cancelled');
+
+  setErr_offline = () => this.setState({ errorKind:'offline' });
+  setErr_duplicate = () => this.setState({ errorKind:'duplicate' });
+  setErr_timeout = () => this.setState({ errorKind:'timeout' });
+  setErr_unknown = () => this.setState({ errorKind:'unknown' });
+
+  setScaleNormal = () => this.setState({ textScale:'normal' });
+  setScaleLarge = () => this.setState({ textScale:'large' });
+  setSpeedSlow = () => this.setState({ speechSpeed:'slow' });
+  setSpeedNormal = () => this.setState({ speechSpeed:'normal' });
+  setSpeedFast = () => this.setState({ speechSpeed:'fast' });
+
+  connectGuardian = () => { this.setState({ guardianConnected:true }); this.go('guardian_help'); };
+  sendGuardianRequest = () => this.setState({ guardianSent:true });
+
+  goBack = () => {
+    const map = {
+      onboard_mic:'home', onboard_contacts:'transcript_confirm', onboard_call:'home', onboard_notif:'home',
+      permission_denied_onboard: this.state.deniedFrom,
+      listening:'home', transcript_confirm:'listening', candidates:'transcript_confirm', candidates_none:'transcript_confirm',
+      final_confirm:'candidates', calling:'final_confirm', result_success:'home', result_cancelled:'home', result_permission_denied:'home', result_error:'home',
+      recent:'home', settings:'home', guardian_connect:'settings', guardian_help:'home',
+    };
+    if (map[this.state.screen]) this.go(map[this.state.screen]);
+  };
+
+  renderVals() {
+    const s = this.state;
+    const NO_BACK = new Set(['splash','onboard_intro','home']);
+    const is = {};
+    Object.keys(SCREEN_INFO).forEach(k => { is[k] = s.screen === k; });
+
+    const errMsgs = {
+      offline: '음성 기능은 지금 연결하기 어려워요.\n글자로 입력하면 연락처를 찾을 수 있어요.',
+      duplicate: '이미 처리 중인 요청이 있어요.\n잠시 후 다시 말씀해 주세요.',
+      timeout: '응답을 받는 데 시간이 너무 오래 걸렸어요.\n다시 시도해 주세요.',
+      unknown: '요청을 처리하지 못했어요.\n다시 시도하거나 보호자에게 도움을 요청해 주세요.',
+    };
+
+    const large = s.textScale === 'large';
+    const sizes = { home: large?32:26, homeSub: large?24:20, confirm: large?36:30 };
+
+    const groups = GROUPS.map(g => ({
+      label: g.label,
+      items: g.keys.map(k => ({
+        key: k, label: SCREEN_INFO[k].name,
+        onClick: () => this.go(k),
+        border: s.screen===k ? '#2E5BFF' : '#E7EBF3',
+        bg: s.screen===k ? '#EEF2FF' : '#fff',
+        color: s.screen===k ? '#2E5BFF' : '#475467',
+      })),
+    }));
+
+    return {
+      is,
+      state: s,
+      backLabel: '뒤로가기',
+      goBack: this.goBack,
+      backVisible: !NO_BACK.has(s.screen),
+      notSearching: !s.searching,
+      notGuardianSent: !s.guardianSent,
+      partialTranscript: s.partialTranscript,
+      errorMessage: errMsgs[s.errorKind],
+      errorPrimaryLabel: s.errorKind === 'offline' ? '글자로 입력할게요' : '다시 시도하기',
+      errorPrimaryAction: s.errorKind === 'offline' ? this.go_text_input : this.go_listening,
+      guardianStatusText: s.guardianConnected ? '이지은(딸)님과 연결됨' : '연결된 보호자 없음',
+      micPermissionText: s.micGranted ? '허용됨' : '필요할 때 요청',
+      micPermissionColor: s.micGranted ? '#087443' : '#1B2660',
+      micPermissionBg: s.micGranted ? '#ECFDF3' : '#F0F3F9',
+      contactsPermissionText: s.contactsGranted ? '허용됨' : '필요할 때 요청',
+      contactsPermissionColor: s.contactsGranted ? '#087443' : '#1B2660',
+      contactsPermissionBg: s.contactsGranted ? '#ECFDF3' : '#F0F3F9',
+      sizes,
+      scaleNormalBorder: s.textScale==='normal' ? '#2E5BFF' : '#E7EBF3', scaleNormalBg: s.textScale==='normal' ? '#EEF2FF' : '#fff',
+      scaleLargeBorder: s.textScale==='large' ? '#2E5BFF' : '#E7EBF3', scaleLargeBg: s.textScale==='large' ? '#EEF2FF' : '#fff',
+      speedSlowBorder: s.speechSpeed==='slow' ? '#2E5BFF' : '#E7EBF3', speedSlowBg: s.speechSpeed==='slow' ? '#EEF2FF' : '#fff',
+      speedNormalBorder: s.speechSpeed==='normal' ? '#2E5BFF' : '#E7EBF3', speedNormalBg: s.speechSpeed==='normal' ? '#EEF2FF' : '#fff',
+      speedFastBorder: s.speechSpeed==='fast' ? '#2E5BFF' : '#E7EBF3', speedFastBg: s.speechSpeed==='fast' ? '#EEF2FF' : '#fff',
+      toggleIntroMore: this.toggleIntroMore,
+      goHome_fromSplash: this.goHome_fromSplash, go_onboard_intro: this.go_onboard_intro,
+      go_onboard_mic: this.go_onboard_mic, go_onboard_contacts: this.go_onboard_contacts,
+      go_onboard_call: this.go_onboard_call, go_onboard_notif: this.go_onboard_notif,
+      finish_onboarding: this.finish_onboarding, allow_mic_permission: this.allow_mic_permission, allow_contacts_permission: this.allow_contacts_permission,
+      deny_onboard_mic: this.deny_onboard_mic, deny_onboard_contacts: this.deny_onboard_contacts,
+      deny_onboard_call: this.deny_onboard_call, deny_onboard_notif: this.deny_onboard_notif,
+      continueAfterDenied: this.continueAfterDenied,
+      go_home_cancel: this.go_home_cancel, go_listening: this.go_listening, go_text_input: this.go_text_input, go_candidates: this.go_candidates,
+      go_recent: this.go_recent, go_settings: this.go_settings, go_guardian_help: this.go_guardian_help,
+      pick_candidate_1: this.pick_candidate_1, pick_candidate_2: this.pick_candidate_2, do_call: this.do_call, cancel_call: this.cancel_call,
+      setErr_offline: this.setErr_offline, setErr_duplicate: this.setErr_duplicate, setErr_timeout: this.setErr_timeout, setErr_unknown: this.setErr_unknown,
+      setScaleNormal: this.setScaleNormal, setScaleLarge: this.setScaleLarge,
+      setSpeedSlow: this.setSpeedSlow, setSpeedNormal: this.setSpeedNormal, setSpeedFast: this.setSpeedFast,
+      connectGuardian: this.connectGuardian, sendGuardianRequest: this.sendGuardianRequest,
+      info: SCREEN_INFO[s.screen] || SCREEN_INFO.home,
+      groups,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
