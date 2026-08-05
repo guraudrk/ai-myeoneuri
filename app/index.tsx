@@ -21,7 +21,7 @@ import { searchBusinesses, dialBusiness } from "@/services/businessCallService";
 import { createRealContactsAdapter } from "@/features/contacts/RealContactsAdapter";
 import { createRealPhoneAdapter } from "@/features/calling/RealPhoneAdapter";
 import { createRealLocationAdapter } from "@/features/location/RealLocationAdapter";
-import { createMockBusinessSearchAdapter } from "@/features/business/MockBusinessSearchAdapter";
+import { createKakaoBusinessSearchAdapter } from "@/features/business/KakaoBusinessSearchAdapter";
 import { createExpoSpeechAdapter } from "@/features/speech/ExpoSpeechAdapter";
 import { parseIntent } from "@/features/intent/intentParser";
 import {
@@ -44,7 +44,7 @@ import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapte
 const contactsAdapter = createRealContactsAdapter();
 const phoneAdapter = createRealPhoneAdapter();
 const locationAdapter = createRealLocationAdapter();
-const businessAdapter = createMockBusinessSearchAdapter();
+const businessAdapter = createKakaoBusinessSearchAdapter();
 
 let requestCounter = 0;
 function nextRequestId(): string {
