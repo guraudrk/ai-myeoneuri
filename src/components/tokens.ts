@@ -1,12 +1,13 @@
 export const Colors = {
-  background: "#F0F4F8",
+  background: "#F2F4F6",      // Toss-style page background
   surface: "#FFFFFF",
-  border: "#E2E8F0",
+  surfaceSecondary: "#F8FAFB",  // phone box background
+  border: "#E5E8EB",
 
   textPrimary: "#0F172A",
-  textSecondary: "#475569",
+  textSecondary: "#374151",
   textStrong: "#1E293B",
-  textMuted: "#94A3B8",
+  textMuted: "#64748B",       // was #94A3B8 — contrast 강화
   placeholder: "#CBD5E1",
 
   primary: "#2563EB",
@@ -34,7 +35,7 @@ export const Shadow = {
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
-    shadowRadius: 10,
+    shadowRadius: 12,
     elevation: 3,
   },
   button: {
@@ -56,10 +57,11 @@ export const Shadow = {
 export const FontSize = {
   body: 20,
   heading: 24,
-  headingLarge: 28,
+  headingLarge: 30,
   buttonLabel: 20,
   caption: 16,
   label: 14,
+  phone: 26,        // 전화번호 전용 — 어르신 가독성
 } as const;
 
 export const TouchSize = {
@@ -79,6 +81,6 @@ export const Spacing = {
 export const Radius = {
   sm: 10,
   md: 14,
-  lg: 18,
+  lg: 20,           // Toss-style 20px
   pill: 100,
 } as const;

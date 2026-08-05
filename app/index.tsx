@@ -612,8 +612,8 @@ const styles = StyleSheet.create({
   centerFull: { flex: 1, justifyContent: "center", alignItems: "center", gap: Spacing.lg },
   searchingText: { fontSize: FontSize.body, color: Colors.textSecondary },
   contentFull: { flex: 1 },
-  contentInner: { padding: Spacing.xl, gap: Spacing.md },
-  sectionTitle: { fontSize: FontSize.heading, fontWeight: "700", color: Colors.textPrimary, marginBottom: Spacing.sm },
+  contentInner: { padding: Spacing.lg, gap: Spacing.md },
+  sectionTitle: { fontSize: FontSize.headingLarge, fontWeight: "800", color: Colors.textPrimary, marginBottom: Spacing.sm },
   candidateRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   starButton: {
     width: 44,

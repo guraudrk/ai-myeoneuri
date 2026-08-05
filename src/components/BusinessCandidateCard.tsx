@@ -1,5 +1,5 @@
 import { TouchableOpacity, Text, StyleSheet, View, Linking } from "react-native";
-import { Colors, FontSize, TouchSize, Spacing, Shadow, Radius } from "./tokens";
+import { Colors, FontSize, Spacing, Shadow, Radius } from "./tokens";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
 
 interface Props {
@@ -13,11 +13,13 @@ const CATEGORY_EMOJI: Record<string, string> = {
   미용: "💇", 이발: "✂️", 세탁: "👕", 고기: "🥩", 삼겹살: "🥓",
   족발: "🍖", 보쌈: "🥬", 냉면: "🍜", 국밥: "🍲", 식당: "🍽",
   음식점: "🍽", 중국: "🥡", 일식: "🍱", 분식: "🍢", 떡볶이: "🌶",
+  pc: "🖥", 노래: "🎤", 세차: "🚗", 주유: "⛽",
 };
 
 function getCategoryEmoji(category: string): string {
+  const lower = category.toLowerCase();
   for (const [key, emoji] of Object.entries(CATEGORY_EMOJI)) {
-    if (category.includes(key)) return emoji;
+    if (lower.includes(key)) return emoji;
   }
   return "🏪";
 }
@@ -29,50 +31,55 @@ export function BusinessCandidateCard({ business, onPress }: Props) {
     <TouchableOpacity
       style={[styles.card, Shadow.card]}
       onPress={onPress}
-      activeOpacity={0.75}
-      accessibilityLabel={`${business.name}에 전화`}
+      activeOpacity={0.82}
+      accessibilityLabel={`${business.name}, ${business.phone || "전화번호 없음"}, 탭해서 전화`}
       accessibilityRole="button"
     >
-      {/* 헤더 행: 이모지 + 이름 + 거리 */}
-      <View style={styles.headerRow}>
+      {/* ── 헤더: 아이콘 + 이름 + 거리 ── */}
+      <View style={styles.header}>
         <View style={styles.iconBox}>
           <Text style={styles.iconEmoji}>{emoji}</Text>
         </View>
-        <View style={styles.titleBlock}>
+        <View style={styles.nameBlock}>
           <Text style={styles.name} numberOfLines={1}>{business.name}</Text>
-          <Text style={styles.category}>{business.category}</Text>
+          <Text style={styles.category} numberOfLines={1}>{business.category}</Text>
         </View>
         {business.distance && (
-          <View style={styles.distanceBadge}>
-            <Text style={styles.distanceText}>{business.distance}</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{business.distance}</Text>
           </View>
         )}
       </View>
 
-      {/* 주소 */}
-      <Text style={styles.address} numberOfLines={1}>📍 {business.address}</Text>
+      {/* ── 주소 ── */}
+      <Text style={styles.address} numberOfLines={1}>📍  {business.address}</Text>
 
-      {/* 하단 행: 전화번호 + 지도 링크 */}
-      <View style={styles.footerRow}>
-        {business.phone ? (
-          <Text style={styles.phone}>📞 {business.phone}</Text>
-        ) : (
-          <Text style={styles.noPhone}>전화번호 없음</Text>
-        )}
+      {/* ── 전화번호 블록 (Toss-style 강조) ── */}
+      <View style={styles.phoneBlock}>
+        <View style={styles.phoneRow}>
+          <Text style={styles.phoneIcon}>📞</Text>
+          <Text style={styles.phoneNumber} numberOfLines={1}>
+            {business.phone || "전화번호 없음"}
+          </Text>
+        </View>
         {business.placeUrl ? (
           <TouchableOpacity
-            onPress={() => Linking.openURL(business.placeUrl!)}
+            style={styles.mapBtn}
+            onPress={(e) => {
+              e.stopPropagation();
+              Linking.openURL(business.placeUrl!);
+            }}
             accessibilityLabel="카카오맵에서 보기"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Text style={styles.mapLink}>🗺 지도 보기</Text>
+            <Text style={styles.mapBtnText}>🗺{"\n"}지도</Text>
           </TouchableOpacity>
         ) : null}
       </View>
 
-      {/* 탭 안내 */}
-      <View style={styles.callHint}>
-        <Text style={styles.callHintText}>탭하면 전화 연결 →</Text>
+      {/* ── 탭 유도 바 ── */}
+      <View style={styles.callBar}>
+        <Text style={styles.callBarText}>탭하면 전화 연결   ›</Text>
       </View>
     </TouchableOpacity>
   );
@@ -82,88 +89,115 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
-    padding: Spacing.md,
-    gap: Spacing.sm,
+    overflow: "hidden",
   },
-  headerRow: {
+
+  // 헤더
+  header: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
   iconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: Colors.primaryTint,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
-  iconEmoji: {
-    fontSize: 22,
-  },
-  titleBlock: {
-    flex: 1,
-    gap: 2,
-  },
+  iconEmoji: { fontSize: 24 },
+  nameBlock: { flex: 1, gap: 3 },
   name: {
     fontSize: FontSize.body,
     fontWeight: "700",
     color: Colors.textPrimary,
+    lineHeight: 26,
   },
   category: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+    fontSize: FontSize.label,
+    color: Colors.textMuted,
     fontWeight: "500",
   },
-  distanceBadge: {
+  badge: {
     backgroundColor: Colors.primaryTint,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
     paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingVertical: 4,
     flexShrink: 0,
   },
-  distanceText: {
-    fontSize: 13,
+  badgeText: {
+    fontSize: 14,
     color: Colors.primary,
     fontWeight: "700",
   },
+
+  // 주소
   address: {
-    fontSize: 14,
+    fontSize: FontSize.caption,
     color: Colors.textMuted,
-    paddingLeft: 4,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.sm,
+    lineHeight: 22,
   },
-  footerRow: {
+
+  // 전화번호 블록
+  phoneBlock: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    backgroundColor: Colors.surfaceSecondary,
+    marginHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
     gap: Spacing.sm,
   },
-  phone: {
-    fontSize: FontSize.body,
-    color: Colors.textPrimary,
-    fontWeight: "600",
+  phoneRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  phoneIcon: { fontSize: 20 },
+  phoneNumber: {
+    fontSize: FontSize.phone,
+    fontWeight: "800",
+    color: Colors.primary,
+    letterSpacing: 0.5,
     flex: 1,
   },
-  noPhone: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    flex: 1,
+  mapBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    borderLeftWidth: 1,
+    borderLeftColor: Colors.border,
+    minWidth: 48,
   },
-  mapLink: {
+  mapBtnText: {
     fontSize: 13,
     color: Colors.primary,
+    fontWeight: "600",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+
+  // 탭 유도 바
+  callBar: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  callBarText: {
+    fontSize: FontSize.caption,
+    color: "#FFFFFF",
     fontWeight: "700",
-  },
-  callHint: {
-    alignItems: "flex-end",
-  },
-  callHintText: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    fontStyle: "italic",
+    letterSpacing: 0.3,
   },
 });
