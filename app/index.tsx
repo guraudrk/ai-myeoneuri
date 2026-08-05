@@ -24,7 +24,7 @@ import { createRealPhoneAdapter } from "@/features/calling/RealPhoneAdapter";
 import { createRealLocationAdapter } from "@/features/location/RealLocationAdapter";
 import { createKakaoBusinessSearchAdapter } from "@/features/business/KakaoBusinessSearchAdapter";
 import { createExpoSpeechAdapter } from "@/features/speech/ExpoSpeechAdapter";
-import { parseIntent } from "@/features/intent/intentParser";
+import { parseIntent, askGemini } from "@/features/intent/intentParser";
 import {
   getFavorites,
   addFavorite,
@@ -122,7 +122,9 @@ export default function HomeScreen() {
     }
 
     if (parsed.intent === "general_question") {
-      setScreen({ type: "general_answer", question: query, answer: parsed.answer });
+      // 2차 호출 — 분류 프롬프트 없이 질문 원문을 Gemini에게 그대로 던진다
+      const answer = await askGemini(parsed.utterance);
+      setScreen({ type: "general_answer", question: parsed.utterance, answer });
       return;
     }
 
