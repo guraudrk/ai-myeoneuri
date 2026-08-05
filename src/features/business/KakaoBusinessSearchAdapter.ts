@@ -31,7 +31,7 @@ function formatDistance(meters: string): string {
 export function createKakaoBusinessSearchAdapter(): BusinessSearchAdapter {
   return {
     async search(query, position) {
-      if (!KAKAO_KEY) return [];
+      if (!KAKAO_KEY) throw new Error("KAKAO_KEY_EMPTY — env 변수가 APK에 포함되지 않았어요");
 
       const params = new URLSearchParams({ query, size: "5" });
       if (position) {
@@ -46,7 +46,10 @@ export function createKakaoBusinessSearchAdapter(): BusinessSearchAdapter {
         { headers: { Authorization: `KakaoAK ${KAKAO_KEY}` } }
       );
 
-      if (!res.ok) return [];
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        throw new Error(`Kakao ${res.status}: ${errBody.slice(0, 300)}`);
+      }
 
       const data = (await res.json()) as KakaoResponse;
       return data.documents.map((doc): BusinessCandidate => ({

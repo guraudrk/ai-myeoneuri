@@ -112,6 +112,9 @@ export default function HomeScreen() {
       const result = await searchBusinesses(parsed.query, locationAdapter, businessAdapter);
       if (result.status === "location_denied") {
         setScreen({ type: "permission_denied", reason: "location" });
+      } else if (result.status === "search_error") {
+        Alert.alert("검색 오류 (디버그)", result.reason);
+        setScreen({ type: "no_results" });
       } else if (result.status === "no_results") {
         setScreen({ type: "no_results" });
       } else {

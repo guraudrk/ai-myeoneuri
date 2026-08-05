@@ -7,6 +7,7 @@ import { logEntry } from "@/features/audit/auditLog";
 export type SearchBusinessResult =
   | { status: "location_denied" }
   | { status: "no_results" }
+  | { status: "search_error"; reason: string }
   | { status: "candidates"; candidates: BusinessCandidate[] };
 
 export type DialBusinessResult =
@@ -30,7 +31,13 @@ export async function searchBusinesses(
   }
 
   position = await locationAdapter.getCurrentPosition();
-  const candidates = await businessAdapter.search(query, position ?? undefined);
+
+  let candidates: BusinessCandidate[];
+  try {
+    candidates = await businessAdapter.search(query, position ?? undefined);
+  } catch (e) {
+    return { status: "search_error", reason: e instanceof Error ? e.message : String(e) };
+  }
 
   if (candidates.length === 0) {
     return { status: "no_results" };
