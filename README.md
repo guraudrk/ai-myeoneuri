@@ -44,6 +44,10 @@ Do not overwrite them.
 → masked audit log
 ```
 
+## 개발일지
+
+- [2026-08-05 개발일지](docs/work-log/2026-08-05.md)
+
 ## Security
 
 - Never commit secrets.
