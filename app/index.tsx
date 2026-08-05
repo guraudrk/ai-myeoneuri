@@ -24,7 +24,7 @@ import { createRealPhoneAdapter } from "@/features/calling/RealPhoneAdapter";
 import { createRealLocationAdapter } from "@/features/location/RealLocationAdapter";
 import { createKakaoBusinessSearchAdapter } from "@/features/business/KakaoBusinessSearchAdapter";
 import { createExpoSpeechAdapter } from "@/features/speech/ExpoSpeechAdapter";
-import { parseIntent, askGemini } from "@/features/intent/intentParser";
+import { parseIntent, askGemini, openAppByName } from "@/features/intent/intentParser";
 import {
   getFavorites,
   addFavorite,
@@ -72,6 +72,7 @@ type ScreenState =
   | { type: "confirming_business"; business: BusinessCandidate; requestId: string }
   | { type: "result"; message: string; isError?: boolean }
   | { type: "general_answer"; question: string; answer: string }
+  | { type: "safety_alert"; category: string; utterance: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
   | { type: "no_results" };
 
@@ -129,6 +130,21 @@ export default function HomeScreen() {
       if (parsed.medicineName) setReminderMedicine(parsed.medicineName);
       if (parsed.timeHHMM) setReminderTime(parsed.timeHHMM);
       setShowReminderModal(true);
+      return;
+    }
+
+    if (parsed.intent === "open_app") {
+      const result = await openAppByName(parsed.appName);
+      if (result === "not_found") {
+        setScreen({ type: "result", message: `"${parsed.appName}" 앱을 찾을 수 없어요.\n직접 열어 주세요.`, isError: true });
+      } else {
+        setScreen({ type: "idle" });
+      }
+      return;
+    }
+
+    if (parsed.intent === "safety_concern") {
+      setScreen({ type: "safety_alert", category: parsed.category, utterance: parsed.utterance });
       return;
     }
 
@@ -435,6 +451,7 @@ export default function HomeScreen() {
         screen.type === "confirming_contact" ||
         screen.type === "confirming_business" ||
         screen.type === "general_answer" ||
+        screen.type === "safety_alert" ||
         screen.type === "result") && (
         <ScrollView style={styles.contentFull} contentContainerStyle={styles.contentInner}>
 
@@ -504,6 +521,35 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          {screen.type === "safety_alert" && (() => {
+            const SAFETY_META: Record<string, { emoji: string; title: string; msg: string }> = {
+              fall_risk:            { emoji: "🚨", title: "넘어지셨나요?",     msg: "많이 다치지 않으셨는지 걱정돼요.\n통증이 심하시면 119에 전화하세요." },
+              medication_concern:   { emoji: "💊", title: "약을 못 드셨군요",  msg: "지금이라도 드실 수 있으면 드세요.\n많이 지나셨으면 의사 선생님께 여쭤보세요." },
+              nutrition_concern:    { emoji: "🍚", title: "식사를 못 하셨군요", msg: "조금이라도 드셔야 기운이 나요.\n간단한 것이라도 챙겨 드세요." },
+              mental_health_concern:{ emoji: "💙", title: "힘드신가요?",        msg: "그런 마음이 드실 때가 있어요.\n가까운 분께 연락해 보시는 건 어떨까요?" },
+              mobility_concern:     { emoji: "🦯", title: "거동이 불편하신가요?", msg: "무리하지 마시고 천천히 움직여 주세요.\n필요하면 도움을 요청하세요." },
+              social_isolation:     { emoji: "🤝", title: "외로우신가요?",      msg: "혼자 있는 시간이 길면 힘드시죠.\n가족이나 이웃에게 연락해 보세요." },
+              urgent_medical:       { emoji: "🏥", title: "몸이 많이 안 좋으신가요?", msg: "증상이 심하시면 즉시 119에 전화하세요." },
+            };
+            const meta = SAFETY_META[screen.category] ?? SAFETY_META.urgent_medical;
+            return (
+              <View style={[styles.safetyCard, Shadow.card]}>
+                <Text style={styles.safetyEmoji}>{meta.emoji}</Text>
+                <Text style={styles.safetyTitle}>{meta.title}</Text>
+                <Text style={styles.safetyMsg}>{meta.msg}</Text>
+                <TouchableOpacity
+                  style={[styles.runButton, Shadow.button, { backgroundColor: "#C0392B" }]}
+                  onPress={() => Linking.openURL("tel:119")}
+                >
+                  <Text style={styles.runButtonText}>119 바로 전화</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
+                  <Text style={styles.ghostButtonText}>괜찮아요, 돌아가기</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
 
           {screen.type === "general_answer" && (
             <View style={[styles.answerCard, Shadow.card]}>
@@ -711,6 +757,28 @@ const styles = StyleSheet.create({
   resultTextError: { color: Colors.danger },
   ghostButton: { minHeight: TouchSize.minimum, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl },
   ghostButtonText: { fontSize: FontSize.body, color: Colors.textMuted, fontWeight: "500" },
+  safetyCard: {
+    backgroundColor: "#FFF5F5",
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    alignItems: "center",
+    gap: Spacing.md,
+    borderWidth: 1.5,
+    borderColor: "#FECACA",
+  },
+  safetyEmoji: { fontSize: 56 },
+  safetyTitle: {
+    fontSize: FontSize.headingLarge,
+    fontWeight: "800",
+    color: "#C0392B",
+    textAlign: "center",
+  },
+  safetyMsg: {
+    fontSize: FontSize.body,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 28,
+  },
   answerCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
