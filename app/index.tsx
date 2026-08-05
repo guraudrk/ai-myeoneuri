@@ -11,8 +11,12 @@ import {
   Linking,
   Modal,
   BackHandler,
+  StatusBar,
+  Animated,
 } from "react-native";
+import { Stack } from "expo-router";
 import { Colors, FontFamily, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
+import type { AppCandidate } from "@/features/intent/intentParser";
 import { LargeMicrophoneButton } from "@/components/LargeMicrophoneButton";
 import { ContactCandidateCard } from "@/components/ContactCandidateCard";
 import { ConfirmationPanel } from "@/components/ConfirmationPanel";
@@ -73,6 +77,7 @@ type ScreenState =
   | { type: "result"; message: string; isError?: boolean }
   | { type: "general_answer"; question: string; answer: string }
   | { type: "safety_alert"; category: string; utterance: string }
+  | { type: "app_candidates"; candidates: AppCandidate[]; appFamily: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
   | { type: "no_results" };
 
@@ -87,6 +92,7 @@ export default function HomeScreen() {
   const [reminderTime, setReminderTime] = useState("08:00");
   const inputRef = useRef<TextInput>(null);
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     setupNotificationChannel().catch(() => {});
@@ -103,6 +109,11 @@ export default function HomeScreen() {
       return false;
     });
     return () => sub.remove();
+  }, [screen.type]);
+
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
   }, [screen.type]);
 
   async function loadFavorites() {
@@ -135,9 +146,16 @@ export default function HomeScreen() {
 
     if (parsed.intent === "open_app") {
       const result = await openAppByName(parsed.appName, parsed.packageName);
-      if (result === "not_found") {
-        setScreen({ type: "result", message: `"${parsed.appName}" 앱을 찾을 수 없어요.\n직접 열어 주세요.`, isError: true });
+      if (result.status === "opened") {
+        setScreen({ type: "idle" });
+      } else if (result.status === "ambiguous") {
+        setScreen({ type: "app_candidates", candidates: result.candidates, appFamily: parsed.appName });
       } else {
+        Alert.alert(
+          "앱을 찾을 수 없어요",
+          `"${parsed.appName}" 앱이 설치되어 있지 않아요.\n앱 스토어에서 설치해 주세요.`,
+          [{ text: "확인", style: "default" }]
+        );
         setScreen({ type: "idle" });
       }
       return;
@@ -301,6 +319,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.root}>
+      <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── 약 알림 추가 모달 ── */}
       <Modal visible={showReminderModal} transparent animationType="slide">
@@ -345,6 +364,7 @@ export default function HomeScreen() {
           </View>
 
           <ScrollView style={styles.inputSheet} contentContainerStyle={styles.inputSheetInner} keyboardShouldPersistTaps="handled">
+            <View style={styles.sheetHandle} />
 
             {/* 즐겨찾기 */}
             {favorites.length > 0 && (
@@ -452,8 +472,34 @@ export default function HomeScreen() {
         screen.type === "confirming_business" ||
         screen.type === "general_answer" ||
         screen.type === "safety_alert" ||
+        screen.type === "app_candidates" ||
         screen.type === "result") && (
         <ScrollView style={styles.contentFull} contentContainerStyle={styles.contentInner}>
+          <Animated.View style={{ opacity: fadeAnim, gap: Spacing.md }}>
+
+          {screen.type === "app_candidates" && (
+            <>
+              <Text style={styles.sectionTitle}>어떤 앱을 여실까요?</Text>
+              {screen.candidates.map((c) => (
+                <TouchableOpacity
+                  key={c.packageName}
+                  style={[styles.appCandidateRow, Shadow.card]}
+                  onPress={async () => {
+                    const r = await openAppByName(c.name, c.packageName);
+                    if (r.status === "opened") {
+                      handleReset();
+                    } else {
+                      Alert.alert("설치되어 있지 않아요", `"${c.name}" 앱이 이 폰에 없어요.\n앱 스토어에서 설치해 주세요.`, [{ text: "확인" }]);
+                    }
+                  }}
+                >
+                  <Text style={styles.appCandidateEmoji}>{c.emoji}</Text>
+                  <Text style={styles.appCandidateName}>{c.name}</Text>
+                  <Text style={styles.appCandidateChevron}>›</Text>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
 
           {screen.type === "contact_candidates" && (
             <>
@@ -572,11 +618,13 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {(screen.type === "contact_candidates" || screen.type === "business_candidates") && (
+          {(screen.type === "contact_candidates" || screen.type === "business_candidates" || screen.type === "app_candidates") && (
             <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
               <Text style={styles.ghostButtonText}>취소할게요</Text>
             </TouchableOpacity>
           )}
+
+          </Animated.View>
         </ScrollView>
       )}
     </View>
@@ -587,12 +635,12 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   hero: {
     backgroundColor: Colors.navyDeep,
-    paddingTop: 56,
-    paddingBottom: 32,
+    paddingTop: (StatusBar.currentHeight ?? 24) + 8,
+    paddingBottom: Spacing.md,
     paddingHorizontal: Spacing.xl,
     alignItems: "center",
-    gap: Spacing.md,
-    flex: 0.62,
+    gap: Spacing.sm,
+    flex: 0.65,
     justifyContent: "center",
   },
   appBadge: {
@@ -623,11 +671,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   inputSheet: {
-    flex: 0.38,
+    flex: 0.35,
     backgroundColor: Colors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.sm,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.placeholder,
+    alignSelf: "center",
+    marginBottom: Spacing.sm,
   },
   inputSheetInner: { padding: Spacing.xl, gap: Spacing.md },
   sectionLabel: {
@@ -818,6 +874,18 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   kakaoMapBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "700" },
+  appCandidateRow: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    gap: Spacing.md,
+  },
+  appCandidateEmoji: { fontSize: 28 },
+  appCandidateName: { flex: 1, fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
+  appCandidateChevron: { fontSize: 24, color: Colors.textMuted },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
