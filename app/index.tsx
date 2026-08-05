@@ -14,7 +14,6 @@ import {
   StatusBar,
   Animated,
 } from "react-native";
-import { Stack } from "expo-router";
 import { Colors, FontFamily, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
 import type { AppCandidate } from "@/features/intent/intentParser";
 import { LargeMicrophoneButton } from "@/components/LargeMicrophoneButton";
@@ -319,7 +318,6 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.root}>
-      <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── 약 알림 추가 모달 ── */}
       <Modal visible={showReminderModal} transparent animationType="slide">
