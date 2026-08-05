@@ -34,7 +34,7 @@ export function createKakaoBusinessSearchAdapter(): BusinessSearchAdapter {
     async search(query, position) {
       if (!KAKAO_KEY) throw new Error("KAKAO_KEY_EMPTY — env 변수가 APK에 포함되지 않았어요");
 
-      const params = new URLSearchParams({ query, size: "5" });
+      const params = new URLSearchParams({ query, size: "15" });
       if (position) {
         params.set("x", String(position.lng));
         params.set("y", String(position.lat));

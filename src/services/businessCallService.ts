@@ -42,7 +42,7 @@ export async function searchBusinesses(
   if (candidates.length === 0) {
     return { status: "no_results" };
   }
-  return { status: "candidates", candidates: candidates.slice(0, 3) };
+  return { status: "candidates", candidates };
 }
 
 export async function dialBusiness(

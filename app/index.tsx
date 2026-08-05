@@ -10,6 +10,7 @@ import {
   Alert,
   Linking,
   Modal,
+  BackHandler,
 } from "react-native";
 import { Colors, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
 import { LargeMicrophoneButton } from "@/components/LargeMicrophoneButton";
@@ -79,6 +80,17 @@ export default function HomeScreen() {
     loadFavorites();
     loadReminders();
   }, []);
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (screen.type !== "idle") {
+        handleReset();
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [screen.type]);
 
   async function loadFavorites() {
     setFavorites(await getFavorites());
