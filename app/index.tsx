@@ -56,7 +56,7 @@ type ScreenState =
   | { type: "idle" }
   | { type: "searching" }
   | { type: "contact_candidates"; candidates: ContactCandidate[]; requestId: string }
-  | { type: "business_candidates"; candidates: BusinessCandidate[]; requestId: string }
+  | { type: "business_candidates"; candidates: BusinessCandidate[]; requestId: string; query: string }
   | { type: "confirming_contact"; candidate: ContactCandidate; requestId: string }
   | { type: "confirming_business"; business: BusinessCandidate; requestId: string }
   | { type: "result"; message: string; isError?: boolean }
@@ -130,7 +130,7 @@ export default function HomeScreen() {
       } else if (result.status === "no_results") {
         setScreen({ type: "no_results" });
       } else {
-        setScreen({ type: "business_candidates", candidates: result.candidates, requestId: nextRequestId() });
+        setScreen({ type: "business_candidates", candidates: result.candidates, requestId: nextRequestId(), query: parsed.query });
       }
       return;
     }
@@ -445,6 +445,17 @@ export default function HomeScreen() {
                   onPress={() => setScreen({ type: "confirming_business", business: b, requestId: screen.requestId })}
                 />
               ))}
+              <TouchableOpacity
+                style={styles.kakaoMapBtn}
+                onPress={() => {
+                  const q = encodeURIComponent(screen.query);
+                  Linking.openURL(`kakaomap://search?q=${q}`).catch(() =>
+                    Linking.openURL(`https://map.kakao.com/?q=${q}`)
+                  );
+                }}
+              >
+                <Text style={styles.kakaoMapBtnText}>🗺  카카오맵에서 더 보기</Text>
+              </TouchableOpacity>
             </>
           )}
 
@@ -669,6 +680,15 @@ const styles = StyleSheet.create({
   resultTextError: { color: Colors.danger },
   ghostButton: { minHeight: TouchSize.minimum, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl },
   ghostButtonText: { fontSize: FontSize.body, color: Colors.textMuted, fontWeight: "500" },
+  kakaoMapBtn: {
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderRadius: Radius.pill,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: Spacing.sm,
+  },
+  kakaoMapBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "700" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
