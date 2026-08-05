@@ -60,6 +60,7 @@ type ScreenState =
   | { type: "confirming_contact"; candidate: ContactCandidate; requestId: string }
   | { type: "confirming_business"; business: BusinessCandidate; requestId: string }
   | { type: "result"; message: string; isError?: boolean }
+  | { type: "general_answer"; question: string; answer: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
   | { type: "no_results" };
 
@@ -117,6 +118,11 @@ export default function HomeScreen() {
       if (parsed.medicineName) setReminderMedicine(parsed.medicineName);
       if (parsed.timeHHMM) setReminderTime(parsed.timeHHMM);
       setShowReminderModal(true);
+      return;
+    }
+
+    if (parsed.intent === "general_question") {
+      setScreen({ type: "general_answer", question: query, answer: parsed.answer });
       return;
     }
 
@@ -415,6 +421,7 @@ export default function HomeScreen() {
         screen.type === "business_candidates" ||
         screen.type === "confirming_contact" ||
         screen.type === "confirming_business" ||
+        screen.type === "general_answer" ||
         screen.type === "result") && (
         <ScrollView style={styles.contentFull} contentContainerStyle={styles.contentInner}>
 
@@ -481,6 +488,17 @@ export default function HomeScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
                 <Text style={styles.ghostButtonText}>전화하지 않을게요</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {screen.type === "general_answer" && (
+            <View style={[styles.answerCard, Shadow.card]}>
+              <Text style={styles.answerQuestion}>🎤  "{screen.question}"</Text>
+              <View style={styles.answerDivider} />
+              <Text style={styles.answerText}>{screen.answer}</Text>
+              <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
+                <Text style={styles.ghostButtonText}>홈으로 돌아가기</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -680,6 +698,28 @@ const styles = StyleSheet.create({
   resultTextError: { color: Colors.danger },
   ghostButton: { minHeight: TouchSize.minimum, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl },
   ghostButtonText: { fontSize: FontSize.body, color: Colors.textMuted, fontWeight: "500" },
+  answerCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  answerQuestion: {
+    fontSize: FontSize.caption,
+    color: Colors.textMuted,
+    fontStyle: "italic",
+    lineHeight: 22,
+  },
+  answerDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  answerText: {
+    fontSize: FontSize.body,
+    color: Colors.textPrimary,
+    lineHeight: 30,
+    fontWeight: "500",
+  },
   kakaoMapBtn: {
     borderWidth: 1.5,
     borderColor: Colors.primary,

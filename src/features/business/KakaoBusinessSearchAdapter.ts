@@ -35,11 +35,18 @@ export function createKakaoBusinessSearchAdapter(): BusinessSearchAdapter {
       if (!KAKAO_KEY) throw new Error("KAKAO_KEY_EMPTY — env 변수가 APK에 포함되지 않았어요");
 
       const params = new URLSearchParams({ query, size: "15" });
-      if (position) {
+      // 쿼리에 지역명이 포함된 경우 GPS를 보내지 않음.
+      // GPS + radius를 같이 보내면 카카오가 현재 위치 5km 안으로만 제한하여
+      // "오목교역 치킨집" 같은 원거리 지역 검색이 0건이 된다.
+      // 쿼리에 지역명이 포함된 경우 GPS를 보내지 않음.
+      // GPS + radius를 같이 보내면 카카오가 현재 위치 5km 안으로만 제한하여
+      // "오목교역 치킨집" 같은 원거리 지역 검색이 0건이 된다.
+      const hasExplicitLocation = /역|동|구|시|읍|면|거리|마을|단지|터미널|공항|공원|광장/.test(query);
+      if (position && !hasExplicitLocation) {
         params.set("x", String(position.lng));
         params.set("y", String(position.lat));
-        params.set("radius", "5000");
         params.set("sort", "distance");
+        // radius 미설정 → 거리 제한 없이 가까운 순 정렬
       }
 
       const res = await fetch(
