@@ -90,6 +90,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     overflow: "hidden",
+    marginBottom: Spacing.sm,
   },
 
   // 헤더
@@ -125,14 +126,14 @@ const styles = StyleSheet.create({
   },
   badge: {
     backgroundColor: Colors.primaryTint,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,
     flexShrink: 0,
   },
   badgeText: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.primaryDeep,
     fontWeight: "700",
   },
 
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.caption,
     color: Colors.textMuted,
     paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.xs,
     lineHeight: 22,
   },
 
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceSecondary,
     marginHorizontal: Spacing.md,
     borderRadius: Radius.md,
-    paddingVertical: 12,
+    paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     marginBottom: Spacing.sm,
     gap: Spacing.sm,
@@ -167,7 +168,7 @@ const styles = StyleSheet.create({
   phoneNumber: {
     fontSize: FontSize.phone,
     fontWeight: "800",
-    color: Colors.primary,
+    color: Colors.primaryDeep,
     letterSpacing: 0.5,
     flex: 1,
   },
@@ -190,7 +191,7 @@ const styles = StyleSheet.create({
   // 탭 유도 바
   callBar: {
     backgroundColor: Colors.primary,
-    paddingVertical: 13,
+    paddingVertical: Spacing.sm,
     alignItems: "center",
     justifyContent: "center",
   },

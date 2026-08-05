@@ -12,7 +12,7 @@ import {
   Modal,
   BackHandler,
 } from "react-native";
-import { Colors, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
+import { Colors, FontFamily, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
 import { LargeMicrophoneButton } from "@/components/LargeMicrophoneButton";
 import { ContactCandidateCard } from "@/components/ContactCandidateCard";
 import { ConfirmationPanel } from "@/components/ConfirmationPanel";
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     alignItems: "center",
     gap: Spacing.md,
-    flex: 0.55,
+    flex: 0.62,
     justifyContent: "center",
   },
   appBadge: {
@@ -622,7 +622,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.5,
   },
-  inputSheet: { flex: 0.45, backgroundColor: Colors.background },
+  inputSheet: {
+    flex: 0.38,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    paddingTop: Spacing.lg,
+  },
   inputSheetInner: { padding: Spacing.xl, gap: Spacing.md },
   sectionLabel: {
     fontSize: 13,
@@ -739,6 +745,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: Spacing.sm,
+    borderWidth: 2,
+    borderColor: Colors.accentWarm,
   },
   confirmEmoji: { fontSize: 34 },
   confirmName: { fontSize: FontSize.headingLarge, fontWeight: "700", color: Colors.textPrimary, textAlign: "center" },
@@ -758,19 +766,19 @@ const styles = StyleSheet.create({
   ghostButton: { minHeight: TouchSize.minimum, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl },
   ghostButtonText: { fontSize: FontSize.body, color: Colors.textMuted, fontWeight: "500" },
   safetyCard: {
-    backgroundColor: "#FFF5F5",
+    backgroundColor: Colors.dangerTint,
     borderRadius: Radius.lg,
     padding: Spacing.xl,
     alignItems: "center",
     gap: Spacing.md,
-    borderWidth: 1.5,
-    borderColor: "#FECACA",
+    borderWidth: 2,
+    borderColor: Colors.danger,
   },
   safetyEmoji: { fontSize: 56 },
   safetyTitle: {
     fontSize: FontSize.headingLarge,
     fontWeight: "800",
-    color: "#C0392B",
+    color: Colors.dangerDeep,
     textAlign: "center",
   },
   safetyMsg: {
@@ -780,7 +788,7 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   answerCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.primaryTint,
     borderRadius: Radius.lg,
     padding: Spacing.xl,
     gap: Spacing.md,
@@ -799,7 +807,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.body,
     color: Colors.textPrimary,
     lineHeight: 30,
-    fontWeight: "500",
+    fontFamily: FontFamily.headingMedium,
   },
   kakaoMapBtn: {
     borderWidth: 1.5,

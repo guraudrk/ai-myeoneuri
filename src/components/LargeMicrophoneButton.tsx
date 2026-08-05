@@ -91,7 +91,7 @@ export function LargeMicrophoneButton({ isListening, onPress }: Props) {
         />
         <Animated.View style={{ transform: [{ scale }] }}>
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: bgColor }, Shadow.mic]}
+            style={[styles.button, { backgroundColor: bgColor, borderColor: isListening ? "transparent" : Colors.accentWarm }, Shadow.mic]}
             onPress={onPress}
             activeOpacity={0.85}
             accessibilityLabel={isListening ? "듣는 중, 탭하면 중지" : "말하기 버튼"}
@@ -131,6 +131,7 @@ const styles = StyleSheet.create({
     borderRadius: SIZE / 2,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 4,
   },
   label: {
     fontSize: 17,
