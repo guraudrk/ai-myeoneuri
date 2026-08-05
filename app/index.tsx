@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import { createRealContactsAdapter } from "@/features/contacts/RealContactsAdapt
 import { createRealPhoneAdapter } from "@/features/calling/RealPhoneAdapter";
 import { createRealLocationAdapter } from "@/features/location/RealLocationAdapter";
 import { createMockBusinessSearchAdapter } from "@/features/business/MockBusinessSearchAdapter";
-import { createMockSpeechAdapter } from "@/features/speech/MockSpeechAdapter";
+import { createExpoSpeechAdapter } from "@/features/speech/ExpoSpeechAdapter";
 import { detectIntent, extractBusinessQuery } from "@/features/intent/intentParser";
 import type { ContactCandidate } from "@/domain/types";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
@@ -28,7 +28,6 @@ const contactsAdapter = createRealContactsAdapter();
 const phoneAdapter = createRealPhoneAdapter();
 const locationAdapter = createRealLocationAdapter();
 const businessAdapter = createMockBusinessSearchAdapter();
-const speechAdapter = createMockSpeechAdapter();
 
 let requestCounter = 0;
 function nextRequestId(): string {
@@ -51,6 +50,7 @@ export default function HomeScreen() {
   const [screen, setScreen] = useState<ScreenState>({ type: "idle" });
   const [isListening, setIsListening] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
 
   async function handleSearch(utterance?: string) {
     const query = (utterance ?? input).trim();
