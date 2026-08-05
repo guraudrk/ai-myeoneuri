@@ -1,4 +1,4 @@
-import { TouchableOpacity, Text, StyleSheet, View } from "react-native";
+import { TouchableOpacity, Text, StyleSheet, View, Linking } from "react-native";
 import { Colors, FontSize, TouchSize, Spacing, Shadow, Radius } from "./tokens";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
 
@@ -30,6 +30,18 @@ export function BusinessCandidateCard({ business, onPress }: Props) {
         </View>
         <Text style={styles.category}>{business.category}</Text>
         <Text style={styles.address} numberOfLines={1}>{business.address}</Text>
+        {business.maskedPhone ? (
+          <Text style={styles.phone}>{business.maskedPhone}</Text>
+        ) : null}
+        {business.placeUrl ? (
+          <TouchableOpacity
+            onPress={() => Linking.openURL(business.placeUrl!)}
+            accessibilityLabel="카카오맵에서 보기"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.mapLink}>🗺 지도에서 보기</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
       <Text style={styles.arrow}>›</Text>
     </TouchableOpacity>
@@ -94,6 +106,18 @@ const styles = StyleSheet.create({
   address: {
     fontSize: 14,
     color: Colors.textMuted,
+  },
+  phone: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: "500",
+    marginTop: 1,
+  },
+  mapLink: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: "600",
+    marginTop: 3,
   },
   arrow: {
     fontSize: 28,

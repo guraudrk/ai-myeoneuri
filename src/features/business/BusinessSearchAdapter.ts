@@ -6,6 +6,7 @@ export interface BusinessCandidate {
   phone: string;
   maskedPhone: string;
   distance?: string;
+  placeUrl?: string;
 }
 
 export interface BusinessSearchAdapter {

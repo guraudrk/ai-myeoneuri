@@ -10,6 +10,7 @@ type KakaoDocument = {
   road_address_name: string;
   phone: string;
   distance: string;
+  place_url: string;
 };
 
 type KakaoResponse = {
@@ -60,6 +61,7 @@ export function createKakaoBusinessSearchAdapter(): BusinessSearchAdapter {
         phone: doc.phone,
         maskedPhone: maskPhone(doc.phone),
         distance: position ? formatDistance(doc.distance) : undefined,
+        placeUrl: doc.place_url || undefined,
       }));
     },
   };
