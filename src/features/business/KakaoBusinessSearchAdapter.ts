@@ -38,15 +38,16 @@ export function createKakaoBusinessSearchAdapter(): BusinessSearchAdapter {
       // 쿼리에 지역명이 포함된 경우 GPS를 보내지 않음.
       // GPS + radius를 같이 보내면 카카오가 현재 위치 5km 안으로만 제한하여
       // "오목교역 치킨집" 같은 원거리 지역 검색이 0건이 된다.
-      // 쿼리에 지역명이 포함된 경우 GPS를 보내지 않음.
-      // GPS + radius를 같이 보내면 카카오가 현재 위치 5km 안으로만 제한하여
-      // "오목교역 치킨집" 같은 원거리 지역 검색이 0건이 된다.
+      // GPS는 항상 보낸다 → Kakao가 distance 필드를 채워준다.
+      // 단, 지역명이 포함된 경우 sort=distance를 빼서 Kakao가 키워드 관련도 기준으로 정렬하게 한다.
+      // radius는 보내지 않는다 → 거리 제한 없이 전 범위 검색.
       const hasExplicitLocation = /역|동|구|시|읍|면|거리|마을|단지|터미널|공항|공원|광장/.test(query);
-      if (position && !hasExplicitLocation) {
+      if (position) {
         params.set("x", String(position.lng));
         params.set("y", String(position.lat));
-        params.set("sort", "distance");
-        // radius 미설정 → 거리 제한 없이 가까운 순 정렬
+        if (!hasExplicitLocation) {
+          params.set("sort", "distance");
+        }
       }
 
       const res = await fetch(
