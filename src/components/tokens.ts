@@ -1,5 +1,12 @@
 // 구글 폰트: IBM Plex Sans KR (헤딩/브랜드) + Noto Sans KR (본문)
 // 설치: expo install expo-font @expo-google-fonts/ibm-plex-sans-kr @expo-google-fonts/noto-sans-kr
+import { Dimensions } from "react-native";
+
+const { width } = Dimensions.get("window");
+const BASE_WIDTH = 390;                                          // Galaxy S24 기준
+// 갤A15(360dp) → ×0.92, 갤S24(393dp) → ×1.0, 대화면 상한 ×1.1
+const s = (n: number) =>
+  Math.round(n * Math.min(Math.max(width / BASE_WIDTH, 0.85), 1.1));
 
 export const Colors = {
   background:       "#F5F6FA",
@@ -37,28 +44,28 @@ export const FontFamily = {
 } as const;
 
 export const FontSize = {
-  body:         20,
-  heading:      24,
-  headingLarge: 34,   // 30 → 34
-  buttonLabel:  20,
-  caption:      16,
-  label:        14,
-  phone:        28,   // 26 → 28
-} as const;
+  body:         s(20),
+  heading:      s(24),
+  headingLarge: s(34),
+  buttonLabel:  s(20),
+  caption:      s(16),
+  label:        s(14),
+  phone:        s(28),
+};
 
 export const LineHeight = {
-  body:         28,
-  heading:      32,
-  headingLarge: 44,
-  buttonLabel:  26,
-  caption:      22,
-  phone:        34,
-} as const;
+  body:         s(28),
+  heading:      s(32),
+  headingLarge: s(44),
+  buttonLabel:  s(26),
+  caption:      s(22),
+  phone:        s(34),
+};
 
 export const TouchSize = {
-  minimum:    56,
-  microphone: 168,   // 144 → 168
-} as const;
+  minimum:    56,        // 접근성 최소값 — 고정
+  microphone: s(168),
+};
 
 export const Spacing = {
   xs: 4,
