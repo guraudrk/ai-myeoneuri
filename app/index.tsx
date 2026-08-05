@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Alert,
+  Linking,
+  Modal,
 } from "react-native";
 import { Colors, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
 import { LargeMicrophoneButton } from "@/components/LargeMicrophoneButton";
@@ -20,7 +23,21 @@ import { createRealPhoneAdapter } from "@/features/calling/RealPhoneAdapter";
 import { createRealLocationAdapter } from "@/features/location/RealLocationAdapter";
 import { createMockBusinessSearchAdapter } from "@/features/business/MockBusinessSearchAdapter";
 import { createExpoSpeechAdapter } from "@/features/speech/ExpoSpeechAdapter";
-import { detectIntent, extractBusinessQuery } from "@/features/intent/intentParser";
+import { parseIntent } from "@/features/intent/intentParser";
+import {
+  getFavorites,
+  addFavorite,
+  removeFavorite,
+  type FavoriteContact,
+} from "@/features/favorites/FavoritesAdapter";
+import {
+  getReminders,
+  addReminder,
+  removeReminder,
+  setupNotificationChannel,
+  requestNotificationPermission,
+  type Reminder,
+} from "@/features/reminders/ReminderService";
 import type { ContactCandidate } from "@/domain/types";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
 
@@ -49,19 +66,50 @@ export default function HomeScreen() {
   const [input, setInput] = useState("");
   const [screen, setScreen] = useState<ScreenState>({ type: "idle" });
   const [isListening, setIsListening] = useState(false);
+  const [favorites, setFavorites] = useState<FavoriteContact[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [reminderMedicine, setReminderMedicine] = useState("");
+  const [reminderTime, setReminderTime] = useState("08:00");
   const inputRef = useRef<TextInput>(null);
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
+
+  useEffect(() => {
+    setupNotificationChannel().catch(() => {});
+    loadFavorites();
+    loadReminders();
+  }, []);
+
+  async function loadFavorites() {
+    setFavorites(await getFavorites());
+  }
+  async function loadReminders() {
+    setReminders(await getReminders());
+  }
 
   async function handleSearch(utterance?: string) {
     const query = (utterance ?? input).trim();
     if (!query) return;
-
     setScreen({ type: "searching" });
-    const intent = detectIntent(query);
 
-    if (intent === "search_business") {
-      const businessQuery = extractBusinessQuery(query);
-      const result = await searchBusinesses(businessQuery, locationAdapter, businessAdapter);
+    const parsed = await parseIntent(query);
+
+    if (parsed.intent === "sos") {
+      setScreen({ type: "idle" });
+      handleSOS();
+      return;
+    }
+
+    if (parsed.intent === "set_reminder") {
+      setScreen({ type: "idle" });
+      if (parsed.medicineName) setReminderMedicine(parsed.medicineName);
+      if (parsed.timeHHMM) setReminderTime(parsed.timeHHMM);
+      setShowReminderModal(true);
+      return;
+    }
+
+    if (parsed.intent === "search_business") {
+      const result = await searchBusinesses(parsed.query, locationAdapter, businessAdapter);
       if (result.status === "location_denied") {
         setScreen({ type: "permission_denied", reason: "location" });
       } else if (result.status === "no_results") {
@@ -69,8 +117,12 @@ export default function HomeScreen() {
       } else {
         setScreen({ type: "business_candidates", candidates: result.candidates, requestId: nextRequestId() });
       }
-    } else {
-      const result = await searchContacts(query, contactsAdapter);
+      return;
+    }
+
+    if (parsed.intent === "call_contact") {
+      const searchQuery = parsed.contactName || query;
+      const result = await searchContacts(searchQuery, contactsAdapter);
       if (result.status === "permission_denied") {
         setScreen({ type: "permission_denied", reason: "contacts" });
       } else if (result.status === "no_results") {
@@ -78,6 +130,17 @@ export default function HomeScreen() {
       } else {
         setScreen({ type: "contact_candidates", candidates: result.candidates, requestId: nextRequestId() });
       }
+      return;
+    }
+
+    // unknown — 연락처로 검색 시도
+    const result = await searchContacts(query, contactsAdapter);
+    if (result.status === "permission_denied") {
+      setScreen({ type: "permission_denied", reason: "contacts" });
+    } else if (result.status === "no_results") {
+      setScreen({ type: "no_results" });
+    } else {
+      setScreen({ type: "contact_candidates", candidates: result.candidates, requestId: nextRequestId() });
     }
   }
 
@@ -94,7 +157,21 @@ export default function HomeScreen() {
         setInput(text);
         handleSearch(text);
       },
-      (_err) => setIsListening(false)
+      (err) => {
+        setIsListening(false);
+        Alert.alert("음성 인식 오류", err);
+      }
+    );
+  }
+
+  function handleSOS() {
+    Alert.alert(
+      "🆘 긴급 전화",
+      "119에 전화하시겠어요?",
+      [
+        { text: "취소", style: "cancel" },
+        { text: "119 전화", style: "destructive", onPress: () => Linking.openURL("tel:119") },
+      ]
     );
   }
 
@@ -105,7 +182,11 @@ export default function HomeScreen() {
     } else if (result.status === "duplicate_blocked") {
       setScreen({ type: "result", message: "이미 전화 화면을 열었어요." });
     } else {
-      setScreen({ type: "result", message: result.status === "phone_not_found" ? "전화번호를 찾을 수 없어요." : (result as { status: "error"; message: string }).message, isError: true });
+      setScreen({
+        type: "result",
+        message: result.status === "phone_not_found" ? "전화번호를 찾을 수 없어요." : (result as { status: "error"; message: string }).message,
+        isError: true,
+      });
     }
   }
 
@@ -120,6 +201,45 @@ export default function HomeScreen() {
     }
   }
 
+  async function handleAddFavorite(candidate: ContactCandidate) {
+    await addFavorite({ id: candidate.id, name: candidate.name });
+    setFavorites(await getFavorites());
+    Alert.alert("즐겨찾기 추가", `${candidate.name} 님을 즐겨찾기에 추가했어요.`);
+  }
+
+  async function handleFavoriteDial(fav: FavoriteContact) {
+    const reqId = nextRequestId();
+    const result = await dialContact(reqId, fav.id, fav.name, contactsAdapter, phoneAdapter);
+    if (result.status === "dialer_opened") {
+      setScreen({ type: "result", message: `${result.contactName} 님께 전화 화면을 열었어요.\n통화 버튼을 눌러 주세요.` });
+    } else {
+      Alert.alert("전화 오류", result.status === "phone_not_found" ? "전화번호를 찾을 수 없어요." : "전화 연결에 실패했어요.");
+    }
+  }
+
+  async function handleRemoveFavorite(id: string) {
+    await removeFavorite(id);
+    setFavorites(await getFavorites());
+  }
+
+  async function handleSaveReminder() {
+    if (!reminderMedicine.trim()) {
+      Alert.alert("약 이름을 입력해 주세요");
+      return;
+    }
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+      Alert.alert("알림 권한이 없어요", "설정 → AI 며느리 → 알림을 허용해 주세요.");
+      return;
+    }
+    await addReminder(reminderMedicine.trim(), reminderTime);
+    setReminders(await getReminders());
+    setShowReminderModal(false);
+    setReminderMedicine("");
+    setReminderTime("08:00");
+    Alert.alert("알림 설정 완료", `매일 ${reminderTime}에 ${reminderMedicine} 복용 알림이 울려요.`);
+  }
+
   function handleReset() {
     setInput("");
     setIsListening(false);
@@ -132,20 +252,93 @@ export default function HomeScreen() {
   return (
     <View style={styles.root}>
 
-      {/* ── IDLE: 다크 히어로 + 입력 시트 ── */}
+      {/* ── 약 알림 추가 모달 ── */}
+      <Modal visible={showReminderModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, Shadow.card]}>
+            <Text style={styles.modalTitle}>💊 약 복용 알림 설정</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={reminderMedicine}
+              onChangeText={setReminderMedicine}
+              placeholder="약 이름 (예: 혈압약)"
+              placeholderTextColor={Colors.placeholder}
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={reminderTime}
+              onChangeText={setReminderTime}
+              placeholder="시간 (예: 08:00)"
+              placeholderTextColor={Colors.placeholder}
+              keyboardType="numbers-and-punctuation"
+            />
+            <TouchableOpacity style={[styles.runButton, Shadow.button]} onPress={handleSaveReminder}>
+              <Text style={styles.runButtonText}>매일 알림 설정</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.ghostButton} onPress={() => setShowReminderModal(false)}>
+              <Text style={styles.ghostButtonText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── IDLE ── */}
       {isIdle && (
         <>
           <View style={styles.hero}>
             <Text style={styles.appBadge}>AI 며느리</Text>
             <Text style={styles.heroTitle}>무엇을{"\n"}도와드릴까요?</Text>
             <LargeMicrophoneButton isListening={isListening} onPress={handleMicPress} />
+            <TouchableOpacity style={styles.sosButton} onPress={handleSOS} accessibilityLabel="긴급 SOS">
+              <Text style={styles.sosText}>🆘  긴급 SOS</Text>
+            </TouchableOpacity>
           </View>
 
-          <ScrollView
-            style={styles.inputSheet}
-            contentContainerStyle={styles.inputSheetInner}
-            keyboardShouldPersistTaps="handled"
-          >
+          <ScrollView style={styles.inputSheet} contentContainerStyle={styles.inputSheetInner} keyboardShouldPersistTaps="handled">
+
+            {/* 즐겨찾기 */}
+            {favorites.length > 0 && (
+              <View>
+                <Text style={styles.sectionLabel}>즐겨찾기</Text>
+                {favorites.map((fav) => (
+                  <View key={fav.id} style={[styles.favRow, Shadow.card]}>
+                    <TouchableOpacity
+                      style={styles.favMain}
+                      onPress={() => handleFavoriteDial(fav)}
+                      accessibilityLabel={`${fav.name} 전화`}
+                    >
+                      <Text style={styles.favName}>{fav.name}</Text>
+                      <Text style={styles.favPhone}>탭하면 전화 연결</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.favDelete} onPress={() => handleRemoveFavorite(fav.id)}>
+                      <Text style={styles.favDeleteText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* 약 알림 목록 */}
+            {reminders.length > 0 && (
+              <View>
+                <Text style={styles.sectionLabel}>약 복용 알림</Text>
+                {reminders.map((r) => (
+                  <View key={r.id} style={[styles.reminderRow, Shadow.card]}>
+                    <View style={styles.reminderMain}>
+                      <Text style={styles.reminderName}>{r.medicineName}</Text>
+                      <Text style={styles.reminderTime}>매일 {r.timeHHMM}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.favDelete} onPress={() => {
+                      removeReminder(r.id).then(() => loadReminders());
+                    }}>
+                      <Text style={styles.favDeleteText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* 직접 입력 */}
             <View style={styles.orRow}>
               <View style={styles.orLine} />
               <Text style={styles.orText}>직접 입력</Text>
@@ -166,12 +359,12 @@ export default function HomeScreen() {
               />
             </View>
 
-            <TouchableOpacity
-              style={[styles.runButton, Shadow.button]}
-              onPress={() => handleSearch()}
-              accessibilityLabel="실행"
-            >
+            <TouchableOpacity style={[styles.runButton, Shadow.button]} onPress={() => handleSearch()} accessibilityLabel="실행">
               <Text style={styles.runButtonText}>실행하기</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.addReminderButton} onPress={() => setShowReminderModal(true)}>
+              <Text style={styles.addReminderText}>+ 약 복용 알림 추가</Text>
             </TouchableOpacity>
 
             {screen.type === "no_results" && (
@@ -202,7 +395,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* ── 비(非)아이들 콘텐츠 ── */}
+      {/* ── 결과 화면 ── */}
       {(screen.type === "contact_candidates" ||
         screen.type === "business_candidates" ||
         screen.type === "confirming_contact" ||
@@ -214,11 +407,15 @@ export default function HomeScreen() {
             <>
               <Text style={styles.sectionTitle}>누구에게 전화할까요?</Text>
               {screen.candidates.map((c) => (
-                <ContactCandidateCard
-                  key={c.id}
-                  candidate={c}
-                  onPress={() => setScreen({ type: "confirming_contact", candidate: c, requestId: screen.requestId })}
-                />
+                <View key={c.id} style={styles.candidateRow}>
+                  <ContactCandidateCard
+                    candidate={c}
+                    onPress={() => setScreen({ type: "confirming_contact", candidate: c, requestId: screen.requestId })}
+                  />
+                  <TouchableOpacity style={styles.starButton} onPress={() => handleAddFavorite(c)} accessibilityLabel="즐겨찾기 추가">
+                    <Text style={styles.starText}>☆</Text>
+                  </TouchableOpacity>
+                </View>
               ))}
             </>
           )}
@@ -252,10 +449,7 @@ export default function HomeScreen() {
               <Text style={styles.confirmName}>{screen.business.name}</Text>
               <Text style={styles.confirmSub}>{screen.business.address}</Text>
               <Text style={styles.confirmQuestion}>지금 전화할까요?</Text>
-              <TouchableOpacity
-                style={[styles.runButton, Shadow.button]}
-                onPress={() => handleConfirmBusiness(screen.business, screen.requestId)}
-              >
+              <TouchableOpacity style={[styles.runButton, Shadow.button]} onPress={() => handleConfirmBusiness(screen.business, screen.requestId)}>
                 <Text style={styles.runButtonEmoji}>📞</Text>
                 <Text style={styles.runButtonText}>전화할게요</Text>
               </TouchableOpacity>
@@ -267,12 +461,8 @@ export default function HomeScreen() {
 
           {screen.type === "result" && (
             <View style={[styles.resultCard, Shadow.card, screen.isError && styles.resultCardError]}>
-              <Text style={styles.resultEmoji}>
-                {screen.isError ? "⚠️" : "✅"}
-              </Text>
-              <Text style={[styles.resultText, screen.isError && styles.resultTextError]}>
-                {screen.message}
-              </Text>
+              <Text style={styles.resultEmoji}>{screen.isError ? "⚠️" : "✅"}</Text>
+              <Text style={[styles.resultText, screen.isError && styles.resultTextError]}>{screen.message}</Text>
               <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
                 <Text style={styles.ghostButtonText}>홈으로 돌아가기</Text>
               </TouchableOpacity>
@@ -284,26 +474,21 @@ export default function HomeScreen() {
               <Text style={styles.ghostButtonText}>취소할게요</Text>
             </TouchableOpacity>
           )}
-
         </ScrollView>
       )}
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  root: { flex: 1, backgroundColor: Colors.background },
   hero: {
     backgroundColor: Colors.navyDeep,
     paddingTop: 56,
-    paddingBottom: 40,
+    paddingBottom: 32,
     paddingHorizontal: Spacing.xl,
     alignItems: "center",
-    gap: Spacing.lg,
+    gap: Spacing.md,
     flex: 0.55,
     justifyContent: "center",
   },
@@ -321,30 +506,69 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 44,
   },
-  inputSheet: {
-    flex: 0.45,
-    backgroundColor: Colors.background,
+  sosButton: {
+    backgroundColor: "#C0392B",
+    borderRadius: Radius.pill,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+    marginTop: 4,
   },
-  inputSheetInner: {
-    padding: Spacing.xl,
-    gap: Spacing.lg,
-  },
-  orRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  orLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.border,
-  },
-  orText: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    fontWeight: "500",
+  sosText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
     letterSpacing: 0.5,
   },
+  inputSheet: { flex: 0.45, backgroundColor: Colors.background },
+  inputSheetInner: { padding: Spacing.xl, gap: Spacing.md },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.textMuted,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  favRow: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  favMain: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.md,
+  },
+  favName: { fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
+  favPhone: { fontSize: FontSize.caption, color: Colors.textMuted, marginTop: 2 },
+  favDelete: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  favDeleteText: { fontSize: 16, color: Colors.textMuted },
+  reminderRow: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  reminderMain: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.md,
+  },
+  reminderName: { fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
+  reminderTime: { fontSize: FontSize.caption, color: Colors.primary, marginTop: 2 },
+  orRow: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
+  orLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  orText: { fontSize: 13, color: Colors.textMuted, fontWeight: "500", letterSpacing: 0.5 },
   inputWrapper: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
@@ -352,11 +576,7 @@ const styles = StyleSheet.create({
     minHeight: TouchSize.minimum,
     justifyContent: "center",
   },
-  input: {
-    fontSize: FontSize.body,
-    color: Colors.textPrimary,
-    paddingVertical: Spacing.md,
-  },
+  input: { fontSize: FontSize.body, color: Colors.textPrimary, paddingVertical: Spacing.md },
   runButton: {
     backgroundColor: Colors.primary,
     borderRadius: Radius.pill,
@@ -367,14 +587,13 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: Spacing.xl,
   },
-  runButtonEmoji: {
-    fontSize: 20,
+  runButtonEmoji: { fontSize: 20 },
+  runButtonText: { color: "#FFFFFF", fontSize: FontSize.buttonLabel, fontWeight: "700" },
+  addReminderButton: {
+    alignItems: "center",
+    paddingVertical: 10,
   },
-  runButtonText: {
-    color: "#FFFFFF",
-    fontSize: FontSize.buttonLabel,
-    fontWeight: "700",
-  },
+  addReminderText: { fontSize: FontSize.caption, color: Colors.primary, fontWeight: "600" },
   statusBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -383,47 +602,25 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     backgroundColor: Colors.surface,
   },
-  statusBoxDanger: {
-    backgroundColor: Colors.dangerBg,
-  },
-  statusEmoji: {
-    fontSize: 22,
-  },
-  statusText: {
-    flex: 1,
-    fontSize: FontSize.caption,
-    color: Colors.textSecondary,
-    lineHeight: 24,
-  },
-  dangerText: {
-    flex: 1,
-    fontSize: FontSize.caption,
-    color: Colors.danger,
-    lineHeight: 24,
-  },
-  centerFull: {
-    flex: 1,
-    justifyContent: "center",
+  statusBoxDanger: { backgroundColor: Colors.dangerBg },
+  statusEmoji: { fontSize: 22 },
+  statusText: { flex: 1, fontSize: FontSize.caption, color: Colors.textSecondary, lineHeight: 24 },
+  dangerText: { flex: 1, fontSize: FontSize.caption, color: Colors.danger, lineHeight: 24 },
+  centerFull: { flex: 1, justifyContent: "center", alignItems: "center", gap: Spacing.lg },
+  searchingText: { fontSize: FontSize.body, color: Colors.textSecondary },
+  contentFull: { flex: 1 },
+  contentInner: { padding: Spacing.xl, gap: Spacing.md },
+  sectionTitle: { fontSize: FontSize.heading, fontWeight: "700", color: Colors.textPrimary, marginBottom: Spacing.sm },
+  candidateRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  starButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.surface,
     alignItems: "center",
-    gap: Spacing.lg,
+    justifyContent: "center",
   },
-  searchingText: {
-    fontSize: FontSize.body,
-    color: Colors.textSecondary,
-  },
-  contentFull: {
-    flex: 1,
-  },
-  contentInner: {
-    padding: Spacing.xl,
-    gap: Spacing.md,
-  },
-  sectionTitle: {
-    fontSize: FontSize.heading,
-    fontWeight: "700",
-    color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-  },
+  starText: { fontSize: 22 },
   confirmCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
@@ -440,25 +637,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: Spacing.sm,
   },
-  confirmEmoji: {
-    fontSize: 34,
-  },
-  confirmName: {
-    fontSize: FontSize.headingLarge,
-    fontWeight: "700",
-    color: Colors.textPrimary,
-    textAlign: "center",
-  },
-  confirmSub: {
-    fontSize: FontSize.caption,
-    color: Colors.textMuted,
-    textAlign: "center",
-  },
-  confirmQuestion: {
-    fontSize: FontSize.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.md,
-  },
+  confirmEmoji: { fontSize: 34 },
+  confirmName: { fontSize: FontSize.headingLarge, fontWeight: "700", color: Colors.textPrimary, textAlign: "center" },
+  confirmSub: { fontSize: FontSize.caption, color: Colors.textMuted, textAlign: "center" },
+  confirmQuestion: { fontSize: FontSize.body, color: Colors.textSecondary, marginBottom: Spacing.md },
   resultCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
@@ -466,31 +648,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.md,
   },
-  resultCardError: {
-    backgroundColor: Colors.dangerBg,
+  resultCardError: { backgroundColor: Colors.dangerBg },
+  resultEmoji: { fontSize: 52 },
+  resultText: { fontSize: FontSize.heading, fontWeight: "700", color: Colors.successText, textAlign: "center", lineHeight: 36 },
+  resultTextError: { color: Colors.danger },
+  ghostButton: { minHeight: TouchSize.minimum, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl },
+  ghostButtonText: { fontSize: FontSize.body, color: Colors.textMuted, fontWeight: "500" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
-  resultEmoji: {
-    fontSize: 52,
+  modalCard: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    padding: Spacing.xl,
+    gap: Spacing.md,
   },
-  resultText: {
-    fontSize: FontSize.heading,
-    fontWeight: "700",
-    color: Colors.successText,
-    textAlign: "center",
-    lineHeight: 36,
-  },
-  resultTextError: {
-    color: Colors.danger,
-  },
-  ghostButton: {
-    minHeight: TouchSize.minimum,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: Spacing.xl,
-  },
-  ghostButtonText: {
+  modalTitle: { fontSize: FontSize.heading, fontWeight: "700", color: Colors.textPrimary, textAlign: "center" },
+  modalInput: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
     fontSize: FontSize.body,
-    color: Colors.textMuted,
-    fontWeight: "500",
+    color: Colors.textPrimary,
+    minHeight: TouchSize.minimum,
   },
 });
