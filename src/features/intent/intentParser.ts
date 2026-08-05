@@ -11,7 +11,8 @@ export type ParsedIntent =
   | { intent: "sos" }
   | { intent: "unknown" };
 
-/** 분류와 무관하게 Gemini에게 직접 질문하고 날것의 텍스트 답변을 반환한다. */
+/** 분류와 무관하게 Gemini에게 직접 질문하고 날것의 텍스트 답변을 반환한다.
+ *  google_search 도구를 켜서 실시간 정보(환율·주가·날씨 등)도 정확하게 답한다. */
 export async function askGemini(question: string): Promise<string> {
   if (!GEMINI_KEY) return "API 키가 없어요.";
   try {
@@ -20,6 +21,7 @@ export async function askGemini(question: string): Promise<string> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: question }] }],
+        tools: [{ google_search: {} }],
         generationConfig: { temperature: 0.7 },
       }),
     });
@@ -28,8 +30,18 @@ export async function askGemini(question: string): Promise<string> {
       Alert.alert("[Gemini 디버그]", `HTTP ${res.status}\n${body.slice(0, 200)}`);
       return "답변을 가져오지 못했어요.";
     }
-    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "답변을 가져오지 못했어요.";
+    const data = await res.json() as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
+    // parts 전체를 이어 붙인다 (검색 결과 텍스트가 여러 part로 나뉠 수 있음)
+    const parts = data.candidates?.[0]?.content?.parts ?? [];
+    const text = parts
+      .map((p) => p.text ?? "")
+      .join("")
+      .trim();
+    return text || "답변을 가져오지 못했어요.";
   } catch (e) {
     return `오류: ${e instanceof Error ? e.message : String(e)}`;
   }

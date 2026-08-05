@@ -42,6 +42,17 @@ import {
 import type { ContactCandidate } from "@/domain/types";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")   // **굵게** → 굵게
+    .replace(/\*(.+?)\*/g, "$1")        // *기울임* → 기울임
+    .replace(/^#{1,6}\s+/gm, "")        // ## 제목 → 제목
+    .replace(/`{1,3}[^`]*`{1,3}/g, "")  // `코드` 제거
+    .replace(/\[(.+?)\]\(.+?\)/g, "$1") // [링크텍스트](url) → 링크텍스트
+    .replace(/^\s*[-*]\s+/gm, "• ")     // - 목록 → • 목록
+    .trim();
+}
+
 const contactsAdapter = createRealContactsAdapter();
 const phoneAdapter = createRealPhoneAdapter();
 const locationAdapter = createRealLocationAdapter();
@@ -498,7 +509,7 @@ export default function HomeScreen() {
             <View style={[styles.answerCard, Shadow.card]}>
               <Text style={styles.answerQuestion}>🎤  "{screen.question}"</Text>
               <View style={styles.answerDivider} />
-              <Text style={styles.answerText}>{screen.answer}</Text>
+              <Text style={styles.answerText}>{stripMarkdown(screen.answer)}</Text>
               <TouchableOpacity style={styles.ghostButton} onPress={handleReset}>
                 <Text style={styles.ghostButtonText}>홈으로 돌아가기</Text>
               </TouchableOpacity>
