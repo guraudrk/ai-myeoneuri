@@ -134,7 +134,7 @@ export default function HomeScreen() {
     }
 
     if (parsed.intent === "open_app") {
-      const result = await openAppByName(parsed.appName);
+      const result = await openAppByName(parsed.appName, parsed.packageName);
       if (result === "not_found") {
         setScreen({ type: "result", message: `"${parsed.appName}" 앱을 찾을 수 없어요.\n직접 열어 주세요.`, isError: true });
       } else {

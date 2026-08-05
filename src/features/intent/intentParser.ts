@@ -19,7 +19,7 @@ export type ParsedIntent =
   | { intent: "set_reminder"; medicineName: string; timeHHMM: string }
   | { intent: "general_question"; utterance: string }
   | { intent: "safety_concern"; category: SafetyCategory; utterance: string }
-  | { intent: "open_app"; appName: string }
+  | { intent: "open_app"; appName: string; packageName: string }
   | { intent: "sos" }
   | { intent: "unknown" };
 
@@ -41,9 +41,27 @@ const APP_LINKS: Record<string, { deeplink: string; fallback: string }> = {
   지도:        { deeplink: "kakaomap://",                                           fallback: "https://map.kakao.com" },
 };
 
-/** 앱 이름으로 딥링크를 열어준다. 실패 시 fallback URL 시도. */
-export async function openAppByName(appName: string): Promise<"opened" | "not_found"> {
-  // 공백 제거 + 유사 키 매칭
+/** 앱 이름으로 딥링크를 열어준다.
+ *  1순위: Gemini가 추론한 packageName → 설치 확인 후 열기
+ *  2순위: APP_LINKS 테이블 (하드코딩된 주요 앱)
+ */
+export async function openAppByName(
+  appName: string,
+  packageName?: string,
+): Promise<"opened" | "not_found"> {
+  // 1순위: Gemini가 패키지명을 알고 있는 경우
+  if (packageName) {
+    const intentUrl = `intent:#Intent;package=${packageName};end`;
+    try {
+      const installed = await Linking.canOpenURL(intentUrl).catch(() => false);
+      if (installed) {
+        await Linking.openURL(intentUrl);
+        return "opened";
+      }
+    } catch {}
+  }
+
+  // 2순위: APP_LINKS 테이블 (유튜브·카카오톡 등 딥링크가 더 깔끔한 앱)
   const key = Object.keys(APP_LINKS).find((k) =>
     appName.replace(/\s/g, "").includes(k) || k.includes(appName.replace(/\s/g, ""))
   );
@@ -119,7 +137,7 @@ export async function parseIntent(utterance: string): Promise<ParsedIntent> {
 1. 장소·가게·업체 검색 → search_business. business_query: 카카오맵에 넣을 최적 검색어. 특정 메뉴명(파닭·마라탕)이 있으면 그것만 사용. 지역명 있으면 "지역명 업종" 형태로 합침. 수식어·동사 제거.
 2. 특정인에게 전화 → call_contact
 3. 약 복용 알림 설정 → set_reminder
-4. 앱 실행 요청(켜줘·열어줘·실행해줘) → open_app. app_name: 앱 이름만.
+4. 앱 실행 요청(켜줘·열어줘·실행해줘) → open_app. app_name: 앱 이름만. package_name: 안드로이드 패키지명(아는 경우만, 모르면 빈 문자열).
 5. 신체 이상·안전 우려 발언 → safety_concern. 카테고리: fall_risk(넘어짐/쓰러짐) | medication_concern(약 못 먹음) | nutrition_concern(밥 못 먹음) | mental_health_concern(우울/외로움) | mobility_concern(걷기 힘듦) | social_isolation(아무도 안 옴) | urgent_medical(응급).
 6. 위험·구조 요청 → sos
 7. 위 외의 모든 질문 → general_question
@@ -132,14 +150,17 @@ export async function parseIntent(utterance: string): Promise<ParsedIntent> {
   "medicine": "(set_reminder)",
   "time": "HH:MM (set_reminder)",
   "app_name": "(open_app)",
+  "package_name": "(open_app) 안드로이드 패키지명. 예: com.kbstar.kbpay, com.toss, com.nhn.android.search. 모르면 빈 문자열.",
   "safety_category": "(safety_concern) fall_risk|medication_concern|nutrition_concern|mental_health_concern|mobility_concern|social_isolation|urgent_medical"
 }
 
 [예시]
 - "딸한테 전화해줘" → {"intent":"call_contact","contact_name":"딸"}
 - "근처 치킨집 찾아줘" → {"intent":"search_business","business_query":"치킨"}
-- "유튜브 켜줘" → {"intent":"open_app","app_name":"유튜브"}
-- "카카오톡 열어줘" → {"intent":"open_app","app_name":"카카오톡"}
+- "유튜브 켜줘" → {"intent":"open_app","app_name":"유튜브","package_name":"com.google.android.youtube"}
+- "카카오톡 열어줘" → {"intent":"open_app","app_name":"카카오톡","package_name":"com.kakao.talk"}
+- "KB페이 켜줘" → {"intent":"open_app","app_name":"KB페이","package_name":"com.kbstar.kbpay"}
+- "토스 열어줘" → {"intent":"open_app","app_name":"토스","package_name":"viva.republica.toss"}
 - "아까 넘어졌어" → {"intent":"safety_concern","safety_category":"fall_risk"}
 - "밥을 못 먹었어" → {"intent":"safety_concern","safety_category":"nutrition_concern"}
 - "요즘 너무 외로워" → {"intent":"safety_concern","safety_category":"social_isolation"}
@@ -168,7 +189,7 @@ export async function parseIntent(utterance: string): Promise<ParsedIntent> {
       case "set_reminder":
         return { intent: "set_reminder", medicineName: parsed.medicine ?? "", timeHHMM: parsed.time ?? "08:00" };
       case "open_app":
-        return { intent: "open_app", appName: parsed.app_name ?? "" };
+        return { intent: "open_app", appName: parsed.app_name ?? "", packageName: parsed.package_name ?? "" };
       case "safety_concern":
         return { intent: "safety_concern", category: (parsed.safety_category as SafetyCategory) ?? "urgent_medical", utterance };
       case "general_question":
