@@ -1,7 +1,7 @@
 import { NativeModules } from "react-native";
 
-const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? "";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
+function getGeminiKey() { return process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? ""; }
+function getGeminiUrl() { return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${getGeminiKey()}`; }
 
 export type SafetyCategory =
   | "fall_risk"
@@ -51,7 +51,7 @@ export type ParsedIntent =
   | { intent: "unknown" };
 
 // ─── 설치 앱 조회 (PackageManager 방식) ─────────────────────────────────────
-type RawApp = { packageName: string; label: string };
+export type RawApp = { packageName: string; label: string };
 
 const { InstalledApps } = NativeModules;
 let _appsCache: RawApp[] | null = null;
@@ -75,12 +75,12 @@ const EMOJI_MAP: Record<string, string> = {
   "com.samsung.android.spay": "💳", "com.sec.android.app.shealth": "❤️",
 };
 
-function norm(s: string) {
+export function norm(s: string) {
   return s.replace(/\s/g, "").toLowerCase();
 }
 
 /** package_name 모를 때 설치 앱 레이블 로컬 매칭 (API 호출 없음) */
-function localMatchApps(appName: string, apps: RawApp[]): RawApp[] {
+export function localMatchApps(appName: string, apps: RawApp[]): RawApp[] {
   const q = norm(appName);
   const exact = apps.filter((a) => norm(a.label) === q);
   if (exact.length > 0) return exact;
@@ -179,7 +179,7 @@ async function geminiPost(opts: FetchOpts): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(GEMINI_URL, {
+      const res = await fetch(getGeminiUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -203,7 +203,7 @@ export async function askGemini(
   question: string,
   opts?: { onRetry?: () => void }
 ): Promise<string> {
-  if (!GEMINI_KEY) {
+  if (!getGeminiKey()) {
     __DEV__ && console.warn("[Gemini] API 키가 없습니다. EXPO_PUBLIC_GEMINI_API_KEY 확인");
     return "지금 답변이 어려워요. 잠시 후 다시 말씀해 주세요.";
   }
@@ -239,7 +239,7 @@ export async function parseIntent(
   utterance: string,
   opts?: { onRetry?: () => void }
 ): Promise<ParsedIntent> {
-  if (!GEMINI_KEY) {
+  if (!getGeminiKey()) {
     __DEV__ && console.warn("[Gemini] API 키가 없습니다. EXPO_PUBLIC_GEMINI_API_KEY 확인");
     return { intent: "unknown" };
   }
