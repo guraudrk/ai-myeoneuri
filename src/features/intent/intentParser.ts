@@ -1,5 +1,4 @@
-import { Alert } from "react-native";
-import { Linking } from "react-native";
+import { Alert, Linking, NativeModules } from "react-native";
 
 const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? "";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
@@ -34,184 +33,110 @@ export type ParsedIntent =
   | { intent: "sos" }
   | { intent: "unknown" };
 
-// ─── 앱 딥링크 테이블 ───────────────────────────────────────────────────────
-// deeplink: 앱 설치 확인 및 실행용 intent scheme
-// fallback: 미설치 시 Play Store로 안내
-const P = (pkg: string) => `intent:#Intent;package=${pkg};end`;
-const PS = (pkg: string) => `https://play.google.com/store/apps/details?id=${pkg}`;
+// ─── 설치 앱 조회 (PackageManager 방식) ─────────────────────────────────────
+type RawApp = { packageName: string; label: string };
 
-const APP_LINKS: Record<string, { deeplink: string; fallback: string }> = {
-  // ── 기본 시스템 ─────────────────────────────────────────────
-  유튜브:       { deeplink: "vnd.youtube:",                                                        fallback: "https://youtube.com" },
-  카메라:       { deeplink: "intent:#Intent;action=android.media.action.STILL_IMAGE_CAMERA;end",  fallback: "" },
-  설정:         { deeplink: "intent:#Intent;action=android.settings.SETTINGS;end",                fallback: "" },
-  전화:         { deeplink: "tel:",                                                                 fallback: "" },
-  문자:         { deeplink: "sms:",                                                                 fallback: "" },
-  갤러리:       { deeplink: P("com.sec.android.gallery3d"),                                        fallback: P("com.google.android.apps.photos") },
-  날씨:         { deeplink: P("com.weather.Weather"),                                              fallback: "https://weather.naver.com" },
-  계산기:       { deeplink: P("com.sec.android.app.popupcalculator"),                              fallback: "" },
-  // ── 메신저·SNS ───────────────────────────────────────────────
-  카카오톡:     { deeplink: P("com.kakao.talk"),      fallback: PS("com.kakao.talk") },
-  라인:         { deeplink: P("jp.naver.line.android"), fallback: PS("jp.naver.line.android") },
-  밴드:         { deeplink: P("com.nhn.android.band"), fallback: PS("com.nhn.android.band") },
-  인스타그램:   { deeplink: P("com.instagram.android"), fallback: "https://instagram.com" },
-  페이스북:     { deeplink: P("com.facebook.katana"),  fallback: "https://facebook.com" },
-  // ── 지도·교통 ────────────────────────────────────────────────
-  카카오맵:     { deeplink: "kakaomap://",             fallback: "https://map.kakao.com" },
-  지도:         { deeplink: "kakaomap://",             fallback: "https://map.kakao.com" },
-  네이버지도:   { deeplink: "nmap://",                 fallback: "https://map.naver.com" },
-  티맵:         { deeplink: P("com.skt.tmap.ui"),      fallback: PS("com.skt.tmap.ui") },
-  카카오택시:   { deeplink: P("com.kakao.taxi"),       fallback: PS("com.kakao.taxi") },
-  카카오버스:   { deeplink: P("com.kakao.bus"),        fallback: PS("com.kakao.bus") },
-  코레일:       { deeplink: P("net.korail.android.nrapp"), fallback: PS("net.korail.android.nrapp") },
-  SRT:          { deeplink: P("com.srail.android"),   fallback: PS("com.srail.android") },
-  // ── 검색·포털 ────────────────────────────────────────────────
-  네이버:       { deeplink: P("com.nhn.android.search"),   fallback: "https://m.naver.com" },
-  다음:         { deeplink: P("net.daum.android.daum"),     fallback: "https://m.daum.net" },
-  구글:         { deeplink: P("com.google.android.googlequicksearchbox"), fallback: "https://google.com" },
-  크롬:         { deeplink: P("com.android.chrome"),        fallback: PS("com.android.chrome") },
-  // ── 금융 · 은행 ──────────────────────────────────────────────
-  토스:         { deeplink: P("viva.republica.toss"),       fallback: PS("viva.republica.toss") },
-  카카오뱅크:   { deeplink: P("com.kakaobank.channel"),     fallback: PS("com.kakaobank.channel") },
-  카카오페이:   { deeplink: P("com.kakaopay.app"),          fallback: PS("com.kakaopay.app") },
-  케이뱅크:     { deeplink: P("com.kbankus.koreanbank"),    fallback: PS("com.kbankus.koreanbank") },
-  뱅크샐러드:   { deeplink: P("com.rainist.banksalad.android"), fallback: PS("com.rainist.banksalad.android") },
-  신한은행:     { deeplink: P("com.shinhan.sbanking"),      fallback: PS("com.shinhan.sbanking") },
-  우리은행:     { deeplink: P("com.wooribank.pib.smart"),   fallback: PS("com.wooribank.pib.smart") },
-  하나은행:     { deeplink: P("com.hanabank.ebankingx"),    fallback: PS("com.hanabank.ebankingx") },
-  농협은행:     { deeplink: P("nh.smart"),                  fallback: PS("nh.smart") },
-  기업은행:     { deeplink: P("com.ibk.online.banking.android"), fallback: PS("com.ibk.online.banking.android") },
-  SC제일은행:   { deeplink: P("kr.co.standardchartered.android.phone"), fallback: PS("kr.co.standardchartered.android.phone") },
-  KB국민은행:   { deeplink: P("com.kbstar.kbbank"),         fallback: PS("com.kbstar.kbbank") },
-  KB페이:       { deeplink: P("com.kbstar.kbpay"),          fallback: PS("com.kbstar.kbpay") },
-  KB증권:       { deeplink: P("com.kbstar.liivmate"),       fallback: PS("com.kbstar.liivmate") },
-  // ── 금융 · 카드 ──────────────────────────────────────────────
-  삼성카드:     { deeplink: P("com.samsung.card.cardboard"),      fallback: PS("com.samsung.card.cardboard") },
-  현대카드:     { deeplink: P("com.hyundaicard.android"),          fallback: PS("com.hyundaicard.android") },
-  롯데카드:     { deeplink: P("com.lotte.lottecardapplication"),   fallback: PS("com.lotte.lottecardapplication") },
-  국민카드:     { deeplink: P("com.kbcard.kbkookmincard"),         fallback: PS("com.kbcard.kbkookmincard") },
-  신한카드:     { deeplink: P("com.shinhancard.smart"),            fallback: PS("com.shinhancard.smart") },
-  우리카드:     { deeplink: P("com.woolca.mobile"),                fallback: PS("com.woolca.mobile") },
-  농협카드:     { deeplink: P("kr.co.nonghyup.nhcardapp"),         fallback: PS("kr.co.nonghyup.nhcardapp") },
-  삼성페이:     { deeplink: P("com.samsung.android.spay"),         fallback: PS("com.samsung.android.spay") },
-  // ── 금융 · 증권 ──────────────────────────────────────────────
-  삼성증권:     { deeplink: P("com.samsungstock"),                 fallback: PS("com.samsungstock") },
-  키움증권:     { deeplink: P("com.kiwoom.android"),               fallback: PS("com.kiwoom.android") },
-  한국투자증권: { deeplink: P("com.koreainvestment.android"),      fallback: PS("com.koreainvestment.android") },
-  미래에셋:     { deeplink: P("com.mirae.tiger"),                  fallback: PS("com.mirae.tiger") },
-  // ── 쇼핑 ─────────────────────────────────────────────────────
-  쿠팡:         { deeplink: P("com.coupang.mobile"),               fallback: "https://coupang.com" },
-  쿠팡이츠:     { deeplink: P("com.coupangeats"),                  fallback: PS("com.coupangeats") },
-  배달의민족:   { deeplink: P("com.nhncorp.deliveryhero.android"), fallback: PS("com.nhncorp.deliveryhero.android") },
-  배민:         { deeplink: P("com.nhncorp.deliveryhero.android"), fallback: PS("com.nhncorp.deliveryhero.android") },
-  요기요:       { deeplink: P("kr.co.dgrocery"),                   fallback: PS("kr.co.dgrocery") },
-  마켓컬리:     { deeplink: P("com.kurly.mobile.android"),         fallback: PS("com.kurly.mobile.android") },
-  컬리:         { deeplink: P("com.kurly.mobile.android"),         fallback: PS("com.kurly.mobile.android") },
-  "11번가":     { deeplink: P("com.elevenst"),                     fallback: PS("com.elevenst") },
-  G마켓:        { deeplink: P("com.gmarket.android.app"),          fallback: "https://gmarket.co.kr" },
-  옥션:         { deeplink: P("com.auction.android"),              fallback: "https://auction.co.kr" },
-  오늘의집:     { deeplink: P("com.ohouse.android"),               fallback: PS("com.ohouse.android") },
-  번개장터:     { deeplink: P("com.jungbo.flashmarket"),           fallback: PS("com.jungbo.flashmarket") },
-  당근마켓:     { deeplink: P("com.towneers.www"),                 fallback: PS("com.towneers.www") },
-  당근:         { deeplink: P("com.towneers.www"),                 fallback: PS("com.towneers.www") },
-  // ── 동영상·엔터테인먼트 ────────────────────────────────────────
-  넷플릭스:     { deeplink: P("com.netflix.mediaclient"),          fallback: PS("com.netflix.mediaclient") },
-  웨이브:       { deeplink: P("com.skbroadband.player.wave"),      fallback: PS("com.skbroadband.player.wave") },
-  티빙:         { deeplink: P("net.cj.cjhv.gs.tving"),            fallback: PS("net.cj.cjhv.gs.tving") },
-  왓챠:         { deeplink: P("com.frograms.watchapps.android"),   fallback: PS("com.frograms.watchapps.android") },
-  쿠팡플레이:   { deeplink: P("com.coupang.ohplay"),               fallback: PS("com.coupang.ohplay") },
-  // ── 헬스·공공 ────────────────────────────────────────────────
-  삼성헬스:     { deeplink: P("com.sec.android.app.shealth"),      fallback: PS("com.sec.android.app.shealth") },
-  건강보험:     { deeplink: P("kr.nhis.nhisapp"),                  fallback: PS("kr.nhis.nhisapp") },
-  국민건강보험: { deeplink: P("kr.nhis.nhisapp"),                  fallback: PS("kr.nhis.nhisapp") },
-  정부24:       { deeplink: P("kr.go.e-government.gov24"),         fallback: PS("kr.go.e-government.gov24") },
-  손택스:       { deeplink: P("kr.go.irs.mts"),                    fallback: PS("kr.go.irs.mts") },
-  // ── 브라우저 ─────────────────────────────────────────────────
-  삼성인터넷:   { deeplink: P("com.sec.android.app.sbrowser"),     fallback: "" },
+const { InstalledApps } = NativeModules;
+let _appsCache: RawApp[] | null = null;
+
+async function getInstalledApps(): Promise<RawApp[]> {
+  if (_appsCache) return _appsCache;
+  try {
+    _appsCache = await InstalledApps.getAll();
+  } catch {
+    _appsCache = [];
+  }
+  return _appsCache ?? [];
+}
+
+// 한국어 속어·별칭 → 설치 앱 레이블 정규화 검색어
+const ALIASES: Record<string, string> = {
+  // AI 앱
+  지피티: "chatgpt", 챗지피티: "chatgpt", "챗gpt": "chatgpt", 클로드: "claude",
+  // 금융 — 레이블 불일치 보완
+  kb은행: "kb국민은행", kb뱅크: "kb국민은행", 국민은행: "kb국민은행",
+  농협: "nh농협은행", 농협은행: "nh농협은행",
+  기업은행: "ibk기업은행",
+  // 쇼핑·배달
+  배민: "배달의민족", 당근: "당근마켓", 컬리: "마켓컬리",
+  // 지도
+  지맵: "카카오맵", "t맵": "티맵",
 };
 
-// ─── 앱 패밀리 테이블 (동일 브랜드 앱이 여러 개일 때 후보 제시) ────────────
-const KB_APPS: AppCandidate[] = [
-  { name: "KB국민은행", packageName: "com.kbstar.kbbank",  emoji: "🏦" },
-  { name: "KB페이",     packageName: "com.kbstar.kbpay",   emoji: "💳" },
-  { name: "KB증권",     packageName: "com.kbstar.liivmate", emoji: "📈" },
-];
-const APP_FAMILIES: Record<string, AppCandidate[]> = {
-  KB:      KB_APPS,
-  국민은행: KB_APPS,
-  카카오: [
-    { name: "카카오톡",   packageName: "com.kakao.talk",        emoji: "💬" },
-    { name: "카카오맵",   packageName: "com.kakao.map",         emoji: "🗺️" },
-    { name: "카카오뱅크", packageName: "com.kakaobank.channel", emoji: "🏦" },
-    { name: "카카오페이", packageName: "com.kakaopay.app",      emoji: "💛" },
-  ],
-  네이버: [
-    { name: "네이버",     packageName: "com.nhn.android.search",  emoji: "🔍" },
-    { name: "네이버지도", packageName: "com.nhn.android.nmap",    emoji: "🗺️" },
-    { name: "네이버페이", packageName: "com.navercorp.naverpay",  emoji: "💚" },
-  ],
-  삼성: [
-    { name: "삼성페이",     packageName: "com.samsung.android.spay",      emoji: "💳" },
-    { name: "삼성헬스",     packageName: "com.sec.android.app.shealth",   emoji: "❤️" },
-    { name: "삼성 인터넷", packageName: "com.sec.android.app.sbrowser",  emoji: "🌐" },
-  ],
-  구글: [
-    { name: "크롬",      packageName: "com.android.chrome",                    emoji: "🌐" },
-    { name: "구글맵",    packageName: "com.google.android.apps.maps",          emoji: "🗺️" },
-    { name: "구글 포토", packageName: "com.google.android.apps.photos",        emoji: "📷" },
-  ],
-  크롬: [
-    { name: "크롬",         packageName: "com.android.chrome",               emoji: "🌐" },
-    { name: "삼성 인터넷", packageName: "com.sec.android.app.sbrowser",      emoji: "🌐" },
-  ],
+// 앱별 이모지 (picker UI용)
+const EMOJI_MAP: Record<string, string> = {
+  "com.kakao.talk": "💬", "com.kakaopay.app": "💛", "com.kakaobank.channel": "🏦",
+  "com.kbstar.kbbank": "🏦", "com.kbstar.kbpay": "💳", "com.kbstar.liivmate": "📈",
+  "viva.republica.toss": "💸", "com.nhn.android.search": "🔍",
+  "com.nhn.android.nmap": "🗺️", "com.google.android.apps.maps": "🗺️",
+  "com.netflix.mediaclient": "🎬", "com.coupang.mobile": "🛍️",
+  "com.samsung.android.spay": "💳", "com.sec.android.app.shealth": "❤️",
 };
 
-/** 앱 이름으로 딥링크를 열어준다.
- *  1순위: Gemini 추론 packageName → intent scheme으로 설치 확인 후 열기
- *  2순위: APP_LINKS 테이블 (유튜브·카카오톡 등 deeplink 특화 앱)
- *  3순위: APP_FAMILIES 테이블 → 후보군 제시 (ambiguous)
- */
+// canOpenURL이 작동하는 커스텀 URI 스킴만 유지 (intent: 계열 제외)
+const URI_SCHEMES: Record<string, string> = {
+  유튜브: "vnd.youtube:",
+  카카오맵: "kakaomap://",
+  지도: "kakaomap://",
+  네이버지도: "nmap://",
+};
+
+function norm(s: string) {
+  return s.replace(/\s/g, "").toLowerCase();
+}
+
+/** 설치 앱 목록에서 퍼지 매칭 후 실행 */
 export async function openAppByName(
   appName: string,
   packageName?: string,
 ): Promise<OpenAppResult> {
-  // 1순위: Gemini가 패키지명을 알고 있는 경우
+  const normName = norm(appName);
+
+  // 1순위: 커스텀 URI 스킴 (유튜브·카카오맵 등 — canOpenURL 신뢰 가능)
+  const schemeKey = Object.keys(URI_SCHEMES).find((k) => norm(k) === normName);
+  if (schemeKey) {
+    const url = URI_SCHEMES[schemeKey];
+    const can = await Linking.canOpenURL(url).catch(() => false);
+    if (can) { await Linking.openURL(url); return { status: "opened" }; }
+  }
+
+  // 2순위: Gemini가 packageName을 이미 알고 있는 경우 → getLaunchIntentForPackage
   if (packageName) {
-    const intentUrl = `intent:#Intent;package=${packageName};end`;
     try {
-      const installed = await Linking.canOpenURL(intentUrl).catch(() => false);
-      if (installed) {
-        await Linking.openURL(intentUrl);
-        return { status: "opened" };
-      }
-    } catch {}
+      await InstalledApps.launch(packageName);
+      return { status: "opened" };
+    } catch { /* 미설치 → 아래로 */ }
   }
 
-  // 2순위: APP_LINKS 테이블
-  const clean = appName.replace(/\s/g, "");
-  const linkKey = Object.keys(APP_LINKS).find((k) =>
-    clean.includes(k) || k.includes(clean)
-  );
-  if (linkKey) {
-    const { deeplink, fallback } = APP_LINKS[linkKey];
+  // 3순위: 설치 앱 목록 퍼지 매칭
+  const search = ALIASES[normName] ?? normName;
+  const apps = await getInstalledApps();
+
+  const matches = apps.filter((a) => {
+    const nl = norm(a.label);
+    return nl === search || nl.includes(search) || search.includes(nl);
+  });
+
+  if (matches.length === 0) return { status: "not_found" };
+
+  if (matches.length === 1) {
     try {
-      if (deeplink) {
-        const can = await Linking.canOpenURL(deeplink).catch(() => false);
-        if (can) { await Linking.openURL(deeplink); return { status: "opened" }; }
-      }
-      if (fallback) { await Linking.openURL(fallback); return { status: "opened" }; }
-    } catch {}
+      await InstalledApps.launch(matches[0].packageName);
+      return { status: "opened" };
+    } catch {
+      return { status: "not_found" };
+    }
   }
 
-  // 3순위: 앱 패밀리 → 후보 목록 제시
-  const familyKey = Object.keys(APP_FAMILIES).find((k) =>
-    clean.includes(k) || k.includes(clean)
-  );
-  if (familyKey) {
-    return { status: "ambiguous", candidates: APP_FAMILIES[familyKey] };
-  }
-
-  return { status: "not_found" };
+  // 복수 매칭 → 선택 picker
+  return {
+    status: "ambiguous",
+    candidates: matches.slice(0, 5).map((a) => ({
+      name: a.label,
+      packageName: a.packageName,
+      emoji: EMOJI_MAP[a.packageName] ?? "📱",
+    })),
+  };
 }
 
 // ─── 어르신 특화 시스템 프롬프트 ────────────────────────────────────────────
