@@ -1,4 +1,4 @@
-import { NativeModules } from "react-native";
+import { NativeModules, AppState } from "react-native";
 
 function getGeminiKey() { return process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? ""; }
 function getGeminiUrl() { return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${getGeminiKey()}`; }
@@ -55,13 +55,30 @@ export type RawApp = { packageName: string; label: string };
 
 const { InstalledApps } = NativeModules;
 let _appsCache: RawApp[] | null = null;
+let _cacheTime: number | null = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5분
+
+export function invalidateAppsCache() {
+  _appsCache = null;
+  _cacheTime = null;
+}
+
+// 다른 앱에서 돌아올 때(설치 후 복귀 포함) 캐시 무효화
+AppState.addEventListener("change", (state) => {
+  if (state === "active") invalidateAppsCache();
+});
 
 async function getInstalledApps(): Promise<RawApp[]> {
-  if (_appsCache) return _appsCache;
+  const now = Date.now();
+  if (_appsCache && _cacheTime != null && now - _cacheTime < CACHE_TTL) {
+    return _appsCache;
+  }
   try {
     _appsCache = await InstalledApps.getAll();
+    _cacheTime = Date.now();
   } catch {
     _appsCache = [];
+    _cacheTime = Date.now();
   }
   return _appsCache ?? [];
 }
@@ -104,7 +121,13 @@ export async function openAppByName(
 
   // 2순위: 설치 앱 레이블 로컬 매칭 (API 호출 없음)
   const apps = await getInstalledApps();
-  const matched = localMatchApps(appName, apps);
+  let matched = localMatchApps(appName, apps);
+  if (matched.length === 0) {
+    // 캐시가 오래됐을 수 있음 → 강제 갱신 후 1회 재시도
+    invalidateAppsCache();
+    const freshApps = await getInstalledApps();
+    matched = localMatchApps(appName, freshApps);
+  }
   if (matched.length === 0) return { status: "not_found" };
 
   if (matched.length === 1) {
