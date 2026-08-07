@@ -129,8 +129,9 @@ describe("parseIntent() — JSON 파싱", () => {
     expect(r).toEqual({ intent: "set_reminder", medicineName: "혈압약", timeHHMM: "09:00" });
   });
 
-  test("open_app", async () => {
-    mockGeminiResponse({ intent: "open_app", app_name: "유튜브", package_name: "com.google.android.youtube" });
+  test("open_app — packageName은 appPackages에서 해석", async () => {
+    // Gemini는 package_name 없이 app_name만 반환; resolvePackageName이 매핑
+    mockGeminiResponse({ intent: "open_app", app_name: "유튜브" });
     const r = await parseIntent("유튜브 켜줘");
     expect(r).toEqual({ intent: "open_app", appName: "유튜브", packageName: "com.google.android.youtube" });
   });

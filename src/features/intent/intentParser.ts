@@ -1,4 +1,5 @@
 import { NativeModules, AppState } from "react-native";
+import { resolvePackageName } from "./appPackages";
 
 function getGeminiKey() { return process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? ""; }
 function getGeminiUrl() { return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${getGeminiKey()}`; }
@@ -278,7 +279,7 @@ export async function parseIntent(
 1. 장소·가게·업체 검색 → search_business. business_query: 카카오맵에 넣을 최적 검색어. 특정 메뉴명(파닭·마라탕)이 있으면 그것만 사용. 지역명 있으면 "지역명 업종" 형태로 합침. 수식어·동사 제거.
 2. 특정인에게 전화 → call_contact
 3. 약 복용 알림 설정 → set_reminder
-4. 앱 실행 요청(켜줘·열어줘·실행해줘) → open_app. app_name: 앱 이름만. package_name: 안드로이드 패키지명. 네 학습 데이터로 아는 앱이면 반드시 반환. 정말 알 수 없을 때만 빈 문자열.
+4. 앱 실행 요청(켜줘·열어줘·실행해줘) → open_app. app_name: 앱 이름만.
 5. 신체 이상·안전 우려 발언 → safety_concern. 카테고리: fall_risk(넘어짐/쓰러짐) | medication_concern(약 못 먹음) | nutrition_concern(밥 못 먹음) | mental_health_concern(우울/외로움) | mobility_concern(걷기 힘듦) | social_isolation(아무도 안 옴) | urgent_medical(응급).
 6. 위험·구조 요청 → sos
 7. 위 외의 모든 질문 → general_question
@@ -291,44 +292,13 @@ export async function parseIntent(
   "medicine": "(set_reminder)",
   "time": "HH:MM (set_reminder)",
   "app_name": "(open_app)",
-  "package_name": "(open_app) 안드로이드 패키지명. 예: com.kbstar.kbpay, com.toss, com.nhn.android.search. 모르면 빈 문자열.",
   "safety_category": "(safety_concern) fall_risk|medication_concern|nutrition_concern|mental_health_concern|mobility_concern|social_isolation|urgent_medical"
 }
 
 [예시]
 - "딸한테 전화해줘" → {"intent":"call_contact","contact_name":"딸"}
-- "근처 치킨집 찾아줘" → {"intent":"search_business","business_query":"치킨"}
-- "유튜브 켜줘" → {"intent":"open_app","app_name":"유튜브","package_name":"com.google.android.youtube"}
-- "인스타 켜줘" → {"intent":"open_app","app_name":"인스타","package_name":"com.instagram.android"}
-- "카카오톡 열어줘" → {"intent":"open_app","app_name":"카카오톡","package_name":"com.kakao.talk"}
-- "카카오뱅크 켜줘" → {"intent":"open_app","app_name":"카카오뱅크","package_name":"com.kakaobank.channel"}
-- "카카오페이 켜줘" → {"intent":"open_app","app_name":"카카오페이","package_name":"com.kakaopay.app"}
-- "KB페이 켜줘" → {"intent":"open_app","app_name":"KB페이","package_name":"com.kbstar.kbpay"}
-- "KB국민은행 켜줘" → {"intent":"open_app","app_name":"KB국민은행","package_name":"com.kbstar.kbbank"}
-- "국민은행 켜줘" → {"intent":"open_app","app_name":"국민은행","package_name":"com.kbstar.kbbank"}
-- "토스 열어줘" → {"intent":"open_app","app_name":"토스","package_name":"viva.republica.toss"}
-- "배달의민족 켜줘" → {"intent":"open_app","app_name":"배달의민족","package_name":"com.nhncorp.deliveryhero.android"}
-- "배민 켜줘" → {"intent":"open_app","app_name":"배민","package_name":"com.nhncorp.deliveryhero.android"}
-- "넷플릭스 켜줘" → {"intent":"open_app","app_name":"넷플릭스","package_name":"com.netflix.mediaclient"}
-- "신한은행 켜줘" → {"intent":"open_app","app_name":"신한은행","package_name":"com.shinhan.sbanking"}
-- "농협은행 켜줘" → {"intent":"open_app","app_name":"농협은행","package_name":"nh.smart"}
-- "하나은행 켜줘" → {"intent":"open_app","app_name":"하나은행","package_name":"com.kebhana.hanapay"}
-- "우리은행 켜줘" → {"intent":"open_app","app_name":"우리은행","package_name":"com.wooribank.pib.smart"}
-- "쿠팡 켜줘" → {"intent":"open_app","app_name":"쿠팡","package_name":"com.coupang.mobile"}
-- "삼성페이 켜줘" → {"intent":"open_app","app_name":"삼성페이","package_name":"com.samsung.android.spay"}
-- "네이버 켜줘" → {"intent":"open_app","app_name":"네이버","package_name":"com.nhn.android.search"}
-- "네이버지도 켜줘" → {"intent":"open_app","app_name":"네이버지도","package_name":"com.nhn.android.nmap"}
-- "카카오맵 켜줘" → {"intent":"open_app","app_name":"카카오맵","package_name":"net.daum.android.map"}
-- "제미나이 켜줘" → {"intent":"open_app","app_name":"제미나이","package_name":"com.google.android.apps.bard"}
-- "챗지피티 켜줘" → {"intent":"open_app","app_name":"챗지피티","package_name":"com.openai.chatgpt"}
-- "지피티 켜줘" → {"intent":"open_app","app_name":"지피티","package_name":"com.openai.chatgpt"}
-- "당근 켜줘" → {"intent":"open_app","app_name":"당근","package_name":"com.towneers.www"}
-- "당근마켓 켜줘" → {"intent":"open_app","app_name":"당근마켓","package_name":"com.towneers.www"}
-- "KB 켜줘" → {"intent":"open_app","app_name":"KB","package_name":""}
-- "카카오 켜줘" → {"intent":"open_app","app_name":"카카오","package_name":""}
+- "유튜브 켜줘" → {"intent":"open_app","app_name":"유튜브"}
 - "아까 넘어졌어" → {"intent":"safety_concern","safety_category":"fall_risk"}
-- "밥을 못 먹었어" → {"intent":"safety_concern","safety_category":"nutrition_concern"}
-- "요즘 너무 외로워" → {"intent":"safety_concern","safety_category":"social_isolation"}
 - "살려줘" → {"intent":"sos"}
 - "오늘 날씨 어때?" → {"intent":"general_question"}` }] }],
         generationConfig: { temperature: 0 },
@@ -354,8 +324,10 @@ export async function parseIntent(
         return { intent: "search_business", query: parsed.business_query ?? utterance };
       case "set_reminder":
         return { intent: "set_reminder", medicineName: parsed.medicine ?? "", timeHHMM: parsed.time ?? "08:00" };
-      case "open_app":
-        return { intent: "open_app", appName: parsed.app_name ?? "", packageName: parsed.package_name ?? "" };
+      case "open_app": {
+        const appName = parsed.app_name ?? "";
+        return { intent: "open_app", appName, packageName: resolvePackageName(appName) };
+      }
       case "safety_concern": {
         const cat = (parsed.safety_category as SafetyCategory) ?? "urgent_medical";
         return { intent: "safety_concern", category: cat, severity: safetyseverity(cat), utterance };
