@@ -167,9 +167,8 @@ export default function HomeScreen() {
     if (parsed.intent === "general_question") {
       const answer = await askGemini(parsed.utterance);
       setScreen({ type: "general_answer", question: parsed.utterance, answer });
-      // 마크다운 제거 후 첫 200자만 읽기 (너무 길면 잘림)
-      const ttsText = stripMarkdown(answer).slice(0, 200);
-      speak(ttsText).catch(() => {});
+      // prepareForSpeech가 마크다운 제거 + 4문장 제한을 내부에서 처리
+      speak(answer).catch(() => {});
       await addLog("💬", parsed.utterance.slice(0, 24));
       loadTodayLogs();
       return;
@@ -623,7 +622,7 @@ export default function HomeScreen() {
                     <Text style={s.answerText}>{stripMarkdown(screen.answer)}</Text>
                     <TouchableOpacity
                       style={[s.replayBtn]}
-                      onPress={() => speak(stripMarkdown(screen.answer).slice(0, 200)).catch(() => {})}
+                      onPress={() => speak(screen.answer).catch(() => {})}
                     >
                       <Text style={s.replayBtnText}>🔊  다시 읽기</Text>
                     </TouchableOpacity>
