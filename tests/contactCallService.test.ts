@@ -50,10 +50,22 @@ describe("searchContacts", () => {
   test("결과 없을 때 no_results 반환", async () => {
     setMockPermission("granted");
     const result = await searchContacts(
-      "형한테 전화해 줘",
+      "전혀없는이름씨에게 전화해 줘",
       createMockContactsAdapter()
     );
     expect(result.status).toBe("no_results");
+  });
+
+  test("미매핑 관계어는 unmapped_relationship 반환", async () => {
+    setMockPermission("granted");
+    const result = await searchContacts(
+      "형한테 전화해 줘",
+      createMockContactsAdapter()
+    );
+    expect(result.status).toBe("unmapped_relationship");
+    if (result.status === "unmapped_relationship") {
+      expect(result.relationship).toBe("형");
+    }
   });
 });
 

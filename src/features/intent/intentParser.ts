@@ -1,4 +1,4 @@
-import { Alert, NativeModules } from "react-native";
+import { NativeModules } from "react-native";
 
 const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? "";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
@@ -164,7 +164,10 @@ const ELDERLY_SYSTEM_PROMPT = `너는 "AI 며느리"야. 60~80대 어르신을 �
 
 /** Gemini에게 질문 원문을 그대로 보내 어르신 친화적 답변을 받는다. */
 export async function askGemini(question: string): Promise<string> {
-  if (!GEMINI_KEY) return "API 키가 없어요.";
+  if (!GEMINI_KEY) {
+    __DEV__ && console.warn("[Gemini] API 키가 없습니다. EXPO_PUBLIC_GEMINI_API_KEY 확인");
+    return "지금 답변이 어려워요. 잠시 후 다시 말씀해 주세요.";
+  }
   try {
     const res = await fetch(GEMINI_URL, {
       method: "POST",
@@ -178,23 +181,24 @@ export async function askGemini(question: string): Promise<string> {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      Alert.alert("[Gemini 디버그]", `HTTP ${res.status}\n${body.slice(0, 200)}`);
-      return "답변을 가져오지 못했어요.";
+      __DEV__ && console.warn(`[Gemini] HTTP ${res.status}`, body.slice(0, 200));
+      return "지금 답변이 어려워요. 잠시 후 다시 말씀해 주세요.";
     }
     const data = await res.json() as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     };
     const parts = data.candidates?.[0]?.content?.parts ?? [];
-    return parts.map((p) => p.text ?? "").join("").trim() || "답변을 가져오지 못했어요.";
+    return parts.map((p) => p.text ?? "").join("").trim() || "지금 답변이 어려워요. 잠시 후 다시 말씀해 주세요.";
   } catch (e) {
-    return `오류: ${e instanceof Error ? e.message : String(e)}`;
+    __DEV__ && console.warn("[Gemini] 네트워크 오류", e);
+    return "인터넷 연결을 확인해 주세요.";
   }
 }
 
 // ─── 인텐트 분류 ─────────────────────────────────────────────────────────────
 export async function parseIntent(utterance: string): Promise<ParsedIntent> {
   if (!GEMINI_KEY) {
-    Alert.alert("[Gemini]", "API 키가 없어요. .env를 확인해 주세요.");
+    __DEV__ && console.warn("[Gemini] API 키가 없습니다. EXPO_PUBLIC_GEMINI_API_KEY 확인");
     return { intent: "unknown" };
   }
 
@@ -270,7 +274,7 @@ export async function parseIntent(utterance: string): Promise<ParsedIntent> {
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      Alert.alert("[Gemini 디버그]", `HTTP ${res.status}\n${body.slice(0, 200)}`);
+      __DEV__ && console.warn(`[Gemini] parseIntent HTTP ${res.status}`, body.slice(0, 200));
       return { intent: "unknown" };
     }
 
@@ -300,7 +304,7 @@ export async function parseIntent(utterance: string): Promise<ParsedIntent> {
         return { intent: "unknown" };
     }
   } catch (e) {
-    Alert.alert("[Gemini 디버그]", `예외: ${e instanceof Error ? e.message : String(e)}`);
+    __DEV__ && console.warn("[Gemini] parseIntent 예외", e);
     return { intent: "unknown" };
   }
 }

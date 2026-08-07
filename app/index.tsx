@@ -196,8 +196,8 @@ export default function HomeScreen() {
       if (result.status === "permission_denied") {
         setScreen({ type: "permission_denied", reason: "contacts" });
       } else if (result.status === "unmapped_relationship") {
-        const allResult = await searchContacts("", contactsAdapter);
-        const all = allResult.status === "candidates" ? allResult.candidates : [];
+        // 서비스 필터를 우회해 전체 연락처를 어댑터에서 직접 가져옴 (빈 쿼리는 필터가 모두 걸러버림)
+        const all = await contactsAdapter.searchContacts("");
         setScreen({ type: "relationship_picker", relationship: result.relationship, allContacts: all });
       } else if (result.status === "no_results") {
         setScreen({ type: "no_results" });
@@ -211,9 +211,8 @@ export default function HomeScreen() {
     if (result.status === "permission_denied") {
       setScreen({ type: "permission_denied", reason: "contacts" });
     } else if (result.status === "unmapped_relationship") {
-      // 관계어는 알지만 누군지 모름 → 연락처 목록 전체 보여주며 가르쳐달라고 요청
-      const allResult = await searchContacts("", contactsAdapter);
-      const all = allResult.status === "candidates" ? allResult.candidates : [];
+      // 서비스 필터를 우회해 전체 연락처를 어댑터에서 직접 가져옴
+      const all = await contactsAdapter.searchContacts("");
       setScreen({ type: "relationship_picker", relationship: result.relationship, allContacts: all });
     } else if (result.status === "no_results") {
       setScreen({ type: "no_results" });

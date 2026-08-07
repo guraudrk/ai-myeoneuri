@@ -58,7 +58,8 @@
     ],
     "testEnvironment": "node",
     "moduleNameMapper": {
-      "^@/(.*)$": "<rootDir>/src/$1"
+      "^@/(.*)$": "<rootDir>/src/$1",
+      "^@react-native-async-storage/async-storage$": "<rootDir>/tests/__mocks__/asyncStorageMock.ts"
     }
   }
 }
