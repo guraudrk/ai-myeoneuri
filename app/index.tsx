@@ -129,7 +129,7 @@ export default function HomeScreen() {
     if (!query) return;
     setShowTextInput(false);
     setInput("");
-    setSearchingMsg("찾고 있어요…");
+    setSearchingMsg("찾아보고 있어요…");
     setScreen({ type: "searching" });
 
     const parsed = await parseIntent(query, {
@@ -171,6 +171,7 @@ export default function HomeScreen() {
     }
 
     if (parsed.intent === "general_question") {
+      setSearchingMsg("정리하고 있어요…");
       const answer = await askGemini(parsed.utterance, {
         onRetry: () => setSearchingMsg("조금만 기다려 주세요…"),
       });
