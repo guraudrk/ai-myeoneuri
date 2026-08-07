@@ -23,12 +23,29 @@ export type OpenAppResult =
   | { status: "not_found" }
   | { status: "ambiguous"; candidates: AppCandidate[] };
 
+export type SafetySeverity = "low" | "medium" | "high";
+
+// SilverLink safety-alert-analyzer 로직 참고: 카테고리 → 기본 심각도 정적 매핑
+const CATEGORY_SEVERITY: Record<SafetyCategory, SafetySeverity> = {
+  fall_risk:            "high",
+  urgent_medical:       "high",
+  medication_concern:   "medium",
+  mobility_concern:     "medium",
+  mental_health_concern:"medium",
+  nutrition_concern:    "low",
+  social_isolation:     "low",
+};
+
+export function safetyseverity(cat: SafetyCategory): SafetySeverity {
+  return CATEGORY_SEVERITY[cat] ?? "medium";
+}
+
 export type ParsedIntent =
   | { intent: "call_contact"; contactName: string }
   | { intent: "search_business"; query: string }
   | { intent: "set_reminder"; medicineName: string; timeHHMM: string }
   | { intent: "general_question"; utterance: string }
-  | { intent: "safety_concern"; category: SafetyCategory; utterance: string }
+  | { intent: "safety_concern"; category: SafetyCategory; severity: SafetySeverity; utterance: string }
   | { intent: "open_app"; appName: string; packageName: string }
   | { intent: "sos" }
   | { intent: "unknown" };
@@ -246,8 +263,10 @@ export async function parseIntent(utterance: string): Promise<ParsedIntent> {
         return { intent: "set_reminder", medicineName: parsed.medicine ?? "", timeHHMM: parsed.time ?? "08:00" };
       case "open_app":
         return { intent: "open_app", appName: parsed.app_name ?? "", packageName: parsed.package_name ?? "" };
-      case "safety_concern":
-        return { intent: "safety_concern", category: (parsed.safety_category as SafetyCategory) ?? "urgent_medical", utterance };
+      case "safety_concern": {
+        const cat = (parsed.safety_category as SafetyCategory) ?? "urgent_medical";
+        return { intent: "safety_concern", category: cat, severity: safetyseverity(cat), utterance };
+      }
       case "general_question":
         return { intent: "general_question", utterance };
       case "sos":

@@ -29,6 +29,9 @@ import { createRealLocationAdapter } from "@/features/location/RealLocationAdapt
 import { createKakaoBusinessSearchAdapter } from "@/features/business/KakaoBusinessSearchAdapter";
 import { createExpoSpeechAdapter } from "@/features/speech/ExpoSpeechAdapter";
 import { parseIntent, askGemini, openAppByName } from "@/features/intent/intentParser";
+import type { SafetySeverity } from "@/features/intent/intentParser";
+import { speak, stop as ttsStop } from "@/features/tts/TtsService";
+import { addLog, getTodayLogs, type LogEntry } from "@/features/conversation-log/ConversationLogService";
 import {
   getFavorites,
   addFavorite,
@@ -74,7 +77,7 @@ type ScreenState =
   | { type: "confirming_business"; business: BusinessCandidate; requestId: string }
   | { type: "result"; message: string; isError?: boolean }
   | { type: "general_answer"; question: string; answer: string }
-  | { type: "safety_alert"; category: string; utterance: string }
+  | { type: "safety_alert"; category: string; severity: SafetySeverity; utterance: string }
   | { type: "app_candidates"; candidates: AppCandidate[]; appFamily: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
   | { type: "no_results" };
@@ -85,6 +88,7 @@ export default function HomeScreen() {
   const [isListening, setIsListening]   = useState(false);
   const [favorites, setFavorites]       = useState<FavoriteContact[]>([]);
   const [reminders, setReminders]       = useState<Reminder[]>([]);
+  const [todayLogs, setTodayLogs]       = useState<LogEntry[]>([]);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [showTextInput, setShowTextInput]         = useState(false);
   const [reminderMedicine, setReminderMedicine]   = useState("");
@@ -96,6 +100,8 @@ export default function HomeScreen() {
     setupNotificationChannel().catch(() => {});
     loadFavorites();
     loadReminders();
+    loadTodayLogs();
+    return () => { ttsStop(); };
   }, []);
 
   useEffect(() => {
@@ -113,6 +119,7 @@ export default function HomeScreen() {
 
   async function loadFavorites() { setFavorites(await getFavorites()); }
   async function loadReminders() { setReminders(await getReminders()); }
+  async function loadTodayLogs() { setTodayLogs(await getTodayLogs()); }
 
   async function handleSearch(utterance?: string) {
     const query = (utterance ?? input).trim();
@@ -136,6 +143,8 @@ export default function HomeScreen() {
     if (parsed.intent === "open_app") {
       const result = await openAppByName(parsed.appName, parsed.packageName);
       if (result.status === "opened") {
+        await addLog("📱", `${parsed.appName} 켰어요`);
+        loadTodayLogs();
         setScreen({ type: "idle" });
       } else if (result.status === "ambiguous") {
         setScreen({ type: "app_candidates", candidates: result.candidates, appFamily: parsed.appName });
@@ -147,13 +156,22 @@ export default function HomeScreen() {
     }
 
     if (parsed.intent === "safety_concern") {
-      setScreen({ type: "safety_alert", category: parsed.category, utterance: parsed.utterance });
+      const ttsText = parsed.severity === "high"
+        ? `긴급 상황인가요? 많이 힘드시면 지금 바로 119에 전화하세요.`
+        : `괜찮으세요? 걱정이 되어서요.`;
+      setScreen({ type: "safety_alert", category: parsed.category, severity: parsed.severity, utterance: parsed.utterance });
+      speak(ttsText).catch(() => {});
       return;
     }
 
     if (parsed.intent === "general_question") {
       const answer = await askGemini(parsed.utterance);
       setScreen({ type: "general_answer", question: parsed.utterance, answer });
+      // 마크다운 제거 후 첫 200자만 읽기 (너무 길면 잘림)
+      const ttsText = stripMarkdown(answer).slice(0, 200);
+      speak(ttsText).catch(() => {});
+      await addLog("💬", parsed.utterance.slice(0, 24));
+      loadTodayLogs();
       return;
     }
 
@@ -213,7 +231,11 @@ export default function HomeScreen() {
   async function handleConfirmContact(candidate: ContactCandidate, requestId: string) {
     const result = await dialContact(requestId, candidate.id, candidate.name, contactsAdapter, phoneAdapter);
     if (result.status === "dialer_opened") {
-      setScreen({ type: "result", message: `${result.contactName} 님께\n전화 화면을 열었어요.` });
+      const msg = `${result.contactName} 님께\n전화 화면을 열었어요.`;
+      setScreen({ type: "result", message: msg });
+      speak(`${result.contactName} 님 전화 화면을 열었어요.`).catch(() => {});
+      await addLog("📞", `${result.contactName} 님께 전화`);
+      loadTodayLogs();
     } else if (result.status === "duplicate_blocked") {
       setScreen({ type: "result", message: "이미 전화 화면을 열었어요." });
     } else {
@@ -224,7 +246,11 @@ export default function HomeScreen() {
   async function handleConfirmBusiness(business: BusinessCandidate, requestId: string) {
     const result = await dialBusiness(requestId, business, phoneAdapter);
     if (result.status === "dialer_opened") {
-      setScreen({ type: "result", message: `${result.businessName}의\n전화 화면을 열었어요.` });
+      const msg = `${result.businessName}의\n전화 화면을 열었어요.`;
+      setScreen({ type: "result", message: msg });
+      speak(`${result.businessName} 전화 화면을 열었어요.`).catch(() => {});
+      await addLog("🏪", `${result.businessName} 전화`);
+      loadTodayLogs();
     } else if (result.status === "duplicate_blocked") {
       setScreen({ type: "result", message: "이미 전화 화면을 열었어요." });
     } else {
@@ -261,6 +287,9 @@ export default function HomeScreen() {
     setShowReminderModal(false);
     setReminderMedicine("");
     setReminderTime("08:00");
+    await addLog("💊", `${reminderMedicine.trim()} 알림 ${reminderTime} 설정`);
+    loadTodayLogs();
+    speak(`매일 ${reminderTime}에 ${reminderMedicine} 복용 알림을 설정했어요.`).catch(() => {});
     Alert.alert("알림 설정 완료", `매일 ${reminderTime}에 ${reminderMedicine} 복용 알림이 울려요.`);
   }
 
@@ -269,6 +298,7 @@ export default function HomeScreen() {
     setIsListening(false);
     setShowTextInput(false);
     speechAdapter.stopListening();
+    ttsStop();
     setScreen({ type: "idle" });
   }
 
@@ -391,6 +421,23 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+              </View>
+            )}
+
+            {/* 오늘의 기록 */}
+            {todayLogs.length > 0 && (
+              <View style={s.logSection}>
+                <Text style={s.favSectionLabel}>오늘 한 일</Text>
+                {todayLogs.slice(0, 3).map((log) => (
+                  <View key={log.id} style={s.logRow}>
+                    <Text style={s.logEmoji}>{log.emoji}</Text>
+                    <Text style={s.logText} numberOfLines={1}>{log.summary}</Text>
+                    <Text style={s.logTime}>{(() => {
+                      const d = new Date(log.timestamp);
+                      return `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
+                    })()}</Text>
+                  </View>
+                ))}
               </View>
             )}
 
@@ -546,9 +593,15 @@ export default function HomeScreen() {
                     social_isolation:     { emoji: "🤝", title: "외로우신가요?",        msg: "혼자 있는 시간이 길면 힘드시죠.\n가족이나 이웃에게 연락해 보세요." },
                     urgent_medical:       { emoji: "🏥", title: "몸이 많이 안 좋으신가요?", msg: "증상이 심하시면 즉시 119에 전화하세요." },
                   };
+                  const SEVERITY_LABEL: Record<string, string> = { high: "🔴 즉시 확인 필요", medium: "🟡 확인 권장", low: "🟢 가볍게 확인" };
+                  const SEVERITY_BORDER: Record<string, string> = { high: "#C0392B", medium: "#F39C12", low: "#12B886" };
                   const m = META[screen.category] ?? META.urgent_medical;
+                  const border = SEVERITY_BORDER[screen.severity] ?? "#C0392B";
                   return (
-                    <View style={[s.safetyCard, Shadow.card]}>
+                    <View style={[s.safetyCard, Shadow.card, { borderColor: border }]}>
+                      <View style={[s.severityPill, { backgroundColor: border + "22" }]}>
+                        <Text style={[s.severityText, { color: border }]}>{SEVERITY_LABEL[screen.severity] ?? "즉시 확인 필요"}</Text>
+                      </View>
                       <Text style={s.safetyEmoji}>{m.emoji}</Text>
                       <Text style={s.safetyTitle}>{m.title}</Text>
                       <Text style={s.safetyMsg}>{m.msg}</Text>
@@ -568,6 +621,12 @@ export default function HomeScreen() {
                     <Text style={s.answerQ}>🎤  "{screen.question}"</Text>
                     <View style={s.divider} />
                     <Text style={s.answerText}>{stripMarkdown(screen.answer)}</Text>
+                    <TouchableOpacity
+                      style={[s.replayBtn]}
+                      onPress={() => speak(stripMarkdown(screen.answer).slice(0, 200)).catch(() => {})}
+                    >
+                      <Text style={s.replayBtnText}>🔊  다시 읽기</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
                       <Text style={s.ghostBtnText}>홈으로 돌아가기</Text>
                     </TouchableOpacity>
@@ -767,6 +826,21 @@ const s = StyleSheet.create({
 
   mapBtn:     { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 14, alignItems: "center", marginTop: Spacing.sm },
   mapBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "700" },
+
+  // 오늘의 기록
+  logSection: { width: "100%", gap: 8 },
+  logRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, paddingHorizontal: 4 },
+  logEmoji: { fontSize: 18, width: 26 },
+  logText:  { flex: 1, fontSize: 14, color: "rgba(255,255,255,0.65)" },
+  logTime:  { fontSize: 12, color: "rgba(255,255,255,0.35)" },
+
+  // 안전 severity 뱃지
+  severityPill: { borderRadius: Radius.pill, paddingVertical: 4, paddingHorizontal: 14, marginBottom: 4 },
+  severityText: { fontSize: 13, fontWeight: "700" },
+
+  // 다시 읽기
+  replayBtn:     { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 12, alignItems: "center", width: "100%" },
+  replayBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "600" },
 
   // 공용 버튼
   primaryBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, minHeight: TouchSize.minimum, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl, width: "100%" },
