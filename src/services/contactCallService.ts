@@ -2,6 +2,7 @@ import type { ContactsAdapter } from "@/features/contacts/ContactsAdapter";
 import type { PhoneAdapter } from "@/features/calling/PhoneAdapter";
 import type { ContactCandidate } from "@/domain/types";
 import { parseContactQuery, matchesQuery } from "@/features/contacts/normalizer";
+import { getMapping } from "@/features/contacts/RelationshipMapper";
 import { isDuplicate, markExecuted } from "@/security/dedup";
 import { logEntry } from "@/features/audit/auditLog";
 import { maskContactName, maskPhoneNumber } from "@/features/audit/auditLog";
@@ -9,6 +10,7 @@ import { maskContactName, maskPhoneNumber } from "@/features/audit/auditLog";
 export type SearchContactsResult =
   | { status: "permission_denied" }
   | { status: "no_results" }
+  | { status: "unmapped_relationship"; relationship: string }
   | { status: "candidates"; candidates: ContactCandidate[] };
 
 export type DialContactResult =
@@ -34,14 +36,29 @@ export async function searchContacts(
   }
 
   const query = parseContactQuery(utterance);
+
+  // 1순위: 관계어가 감지됐으면 매퍼에서 이전에 저장한 매핑 조회
+  if (query.relationship) {
+    const mappedId = await getMapping(query.relationship);
+    if (mappedId) {
+      const all = await contactsAdapter.searchContacts("");
+      const found = all.find((c) => c.id === mappedId);
+      if (found) return { status: "candidates", candidates: [found] };
+    }
+  }
+
+  // 2순위: 연락처 이름 검색
   const searchTerm = query.relationship ?? query.name ?? query.rawQuery;
   const candidates = await contactsAdapter.searchContacts(searchTerm);
-
   const filtered = candidates
     .filter((c) => matchesQuery(c.name, query))
     .slice(0, 3);
 
   if (filtered.length === 0) {
+    // 관계어였는데 매핑도 없고 이름 검색도 안 됨 → 사용자에게 가르쳐달라고 요청
+    if (query.relationship) {
+      return { status: "unmapped_relationship", relationship: query.relationship };
+    }
     return { status: "no_results" };
   }
 

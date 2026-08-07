@@ -173,7 +173,7 @@ export async function askGemini(question: string): Promise<string> {
         system_instruction: { parts: [{ text: ELDERLY_SYSTEM_PROMPT }] },
         contents: [{ parts: [{ text: question }] }],
         tools: [{ google_search: {} }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 512 },
+        generationConfig: { temperature: 0.4 },
       }),
     });
     if (!res.ok) {

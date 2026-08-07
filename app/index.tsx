@@ -32,6 +32,7 @@ import { parseIntent, askGemini, openAppByName } from "@/features/intent/intentP
 import type { SafetySeverity } from "@/features/intent/intentParser";
 import { speak, stop as ttsStop } from "@/features/tts/TtsService";
 import { addLog, getTodayLogs, type LogEntry } from "@/features/conversation-log/ConversationLogService";
+import { saveMapping } from "@/features/contacts/RelationshipMapper";
 import {
   getFavorites,
   addFavorite,
@@ -80,7 +81,8 @@ type ScreenState =
   | { type: "safety_alert"; category: string; severity: SafetySeverity; utterance: string }
   | { type: "app_candidates"; candidates: AppCandidate[]; appFamily: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
-  | { type: "no_results" };
+  | { type: "no_results" }
+  | { type: "relationship_picker"; relationship: string; allContacts: ContactCandidate[] };
 
 export default function HomeScreen() {
   const [input, setInput]               = useState("");
@@ -193,6 +195,10 @@ export default function HomeScreen() {
       const result = await searchContacts(parsed.contactName || query, contactsAdapter);
       if (result.status === "permission_denied") {
         setScreen({ type: "permission_denied", reason: "contacts" });
+      } else if (result.status === "unmapped_relationship") {
+        const allResult = await searchContacts("", contactsAdapter);
+        const all = allResult.status === "candidates" ? allResult.candidates : [];
+        setScreen({ type: "relationship_picker", relationship: result.relationship, allContacts: all });
       } else if (result.status === "no_results") {
         setScreen({ type: "no_results" });
       } else {
@@ -204,6 +210,11 @@ export default function HomeScreen() {
     const result = await searchContacts(query, contactsAdapter);
     if (result.status === "permission_denied") {
       setScreen({ type: "permission_denied", reason: "contacts" });
+    } else if (result.status === "unmapped_relationship") {
+      // 관계어는 알지만 누군지 모름 → 연락처 목록 전체 보여주며 가르쳐달라고 요청
+      const allResult = await searchContacts("", contactsAdapter);
+      const all = allResult.status === "candidates" ? allResult.candidates : [];
+      setScreen({ type: "relationship_picker", relationship: result.relationship, allContacts: all });
     } else if (result.status === "no_results") {
       setScreen({ type: "no_results" });
     } else {
@@ -290,6 +301,11 @@ export default function HomeScreen() {
     loadTodayLogs();
     speak(`매일 ${reminderTime}에 ${reminderMedicine} 복용 알림을 설정했어요.`).catch(() => {});
     Alert.alert("알림 설정 완료", `매일 ${reminderTime}에 ${reminderMedicine} 복용 알림이 울려요.`);
+  }
+
+  async function handleRelationshipSelect(relationship: string, candidate: ContactCandidate) {
+    await saveMapping(relationship, candidate.id);
+    setScreen({ type: "confirming_contact", candidate, requestId: nextRequestId() });
   }
 
   function handleReset() {
@@ -485,6 +501,7 @@ export default function HomeScreen() {
         screen.type === "general_answer" ||
         screen.type === "safety_alert" ||
         screen.type === "app_candidates" ||
+        screen.type === "relationship_picker" ||
         screen.type === "result") && (
         <View style={s.resultRoot}>
           <SafeAreaView style={{ flex: 1 }}>
@@ -641,6 +658,36 @@ export default function HomeScreen() {
                       <Text style={s.ghostBtnText}>홈으로 돌아가기</Text>
                     </TouchableOpacity>
                   </View>
+                )}
+
+                {/* 관계어 피커 — "어느 분이 '딸'이에요?" */}
+                {screen.type === "relationship_picker" && (
+                  <>
+                    <View style={s.relationshipHeader}>
+                      <Text style={s.sectionTitle}>어느 분이 '{screen.relationship}'이에요?</Text>
+                      <Text style={s.relationshipSub}>한 번 알려주시면 다음엔 바로 전화할게요 😊</Text>
+                    </View>
+                    {screen.allContacts.length === 0 ? (
+                      <Text style={s.noResultText}>연락처가 없어요.</Text>
+                    ) : (
+                      screen.allContacts.map((c) => (
+                        <TouchableOpacity
+                          key={c.id}
+                          style={[s.relationshipRow, Shadow.card]}
+                          onPress={() => handleRelationshipSelect(screen.relationship, c)}
+                        >
+                          <View style={s.favAvatar}>
+                            <Text style={s.favInitial}>{c.name.trim()[0] ?? "?"}</Text>
+                          </View>
+                          <Text style={s.relationshipName}>{c.name}</Text>
+                          <Text style={s.appChevron}>›</Text>
+                        </TouchableOpacity>
+                      ))
+                    )}
+                    <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+                      <Text style={s.ghostBtnText}>취소할게요</Text>
+                    </TouchableOpacity>
+                  </>
                 )}
 
                 {(screen.type === "contact_candidates" || screen.type === "business_candidates" || screen.type === "app_candidates") && (
@@ -840,6 +887,20 @@ const s = StyleSheet.create({
   // 다시 읽기
   replayBtn:     { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 12, alignItems: "center", width: "100%" },
   replayBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "600" },
+
+  // 관계어 피커
+  relationshipHeader: { gap: 6, marginBottom: 4 },
+  relationshipSub:    { fontSize: FontSize.caption, color: Colors.textMuted },
+  relationshipRow: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
+    gap: Spacing.md,
+  },
+  relationshipName: { flex: 1, fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
 
   // 공용 버튼
   primaryBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, minHeight: TouchSize.minimum, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl, width: "100%" },
