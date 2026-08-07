@@ -95,6 +95,7 @@ export default function HomeScreen() {
   const [showTextInput, setShowTextInput]         = useState(false);
   const [reminderMedicine, setReminderMedicine]   = useState("");
   const [reminderTime, setReminderTime]           = useState("08:00");
+  const [searchingMsg, setSearchingMsg]           = useState("찾고 있어요…");
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -128,9 +129,12 @@ export default function HomeScreen() {
     if (!query) return;
     setShowTextInput(false);
     setInput("");
+    setSearchingMsg("찾고 있어요…");
     setScreen({ type: "searching" });
 
-    const parsed = await parseIntent(query);
+    const parsed = await parseIntent(query, {
+      onRetry: () => setSearchingMsg("조금만 기다려 주세요…"),
+    });
 
     if (parsed.intent === "sos") { setScreen({ type: "idle" }); handleSOS(); return; }
 
@@ -167,7 +171,9 @@ export default function HomeScreen() {
     }
 
     if (parsed.intent === "general_question") {
-      const answer = await askGemini(parsed.utterance);
+      const answer = await askGemini(parsed.utterance, {
+        onRetry: () => setSearchingMsg("조금만 기다려 주세요…"),
+      });
       setScreen({ type: "general_answer", question: parsed.utterance, answer });
       // prepareForSpeech가 마크다운 제거 + 4문장 제한을 내부에서 처리
       speak(answer).catch(() => {});
@@ -488,7 +494,7 @@ export default function HomeScreen() {
       {screen.type === "searching" && (
         <View style={s.centerFull}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={s.searchingText}>찾고 있어요…</Text>
+          <Text style={s.searchingText}>{searchingMsg}</Text>
         </View>
       )}
 

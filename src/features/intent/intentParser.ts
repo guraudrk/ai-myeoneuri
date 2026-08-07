@@ -160,28 +160,66 @@ const ELDERLY_SYSTEM_PROMPT = `너는 "AI 며느리"야. 60~80대 어르신을 �
 나쁜: "복약 방법: 1) 아침 식후 30분 2) 물과 함께 복용 3) 냉장 보관 필요"
 좋은: "이 약은 아침 식사 후 30분이 지나고 드세요. 물과 함께 드시고, 남은 약은 냉장고에 보관해 주세요."`;
 
-/** Gemini에게 질문 원문을 그대로 보내 어르신 친화적 답변을 받는다. */
+// ─── fetch 타임아웃 + 재시도 헬퍼 ────────────────────────────────────────────
+
+function sleep(ms: number) { return new Promise<void>((r) => setTimeout(r, ms)); }
+
+type FetchOpts = { body: object; timeoutMs: number; maxRetries?: number; onRetry?: () => void };
+
+/** 타임아웃 + 지수 백오프 재시도 (5xx·네트워크 오류만, 4xx는 즉시 반환) */
+async function geminiPost(opts: FetchOpts): Promise<Response> {
+  const { body, timeoutMs, maxRetries = 2, onRetry } = opts;
+  let lastErr: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      onRetry?.();
+      await sleep(attempt * 1000); // 1초 → 2초
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(GEMINI_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok || res.status < 500) return res; // 4xx는 재시도 안 함
+      __DEV__ && console.warn(`[Gemini] HTTP ${res.status}, attempt ${attempt + 1}`);
+      lastErr = new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      clearTimeout(timer);
+      __DEV__ && console.warn(`[Gemini] 오류, attempt ${attempt + 1}`, e);
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
 
 /** Gemini에게 질문 원문을 그대로 보내 어르신 친화적 답변을 받는다. */
-export async function askGemini(question: string): Promise<string> {
+export async function askGemini(
+  question: string,
+  opts?: { onRetry?: () => void }
+): Promise<string> {
   if (!GEMINI_KEY) {
     __DEV__ && console.warn("[Gemini] API 키가 없습니다. EXPO_PUBLIC_GEMINI_API_KEY 확인");
     return "지금 답변이 어려워요. 잠시 후 다시 말씀해 주세요.";
   }
   try {
-    const res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const res = await geminiPost({
+      body: {
         system_instruction: { parts: [{ text: ELDERLY_SYSTEM_PROMPT }] },
         contents: [{ parts: [{ text: question }] }],
         tools: [{ google_search: {} }],
         generationConfig: { temperature: 0.4 },
-      }),
+      },
+      timeoutMs: 20_000,
+      onRetry: opts?.onRetry,
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      __DEV__ && console.warn(`[Gemini] HTTP ${res.status}`, body.slice(0, 200));
+      __DEV__ && console.warn(`[Gemini] askGemini HTTP ${res.status}`);
       return "지금 답변이 어려워요. 잠시 후 다시 말씀해 주세요.";
     }
     const data = await res.json() as {
@@ -190,23 +228,25 @@ export async function askGemini(question: string): Promise<string> {
     const parts = data.candidates?.[0]?.content?.parts ?? [];
     return parts.map((p) => p.text ?? "").join("").trim() || "지금 답변이 어려워요. 잠시 후 다시 말씀해 주세요.";
   } catch (e) {
-    __DEV__ && console.warn("[Gemini] 네트워크 오류", e);
-    return "인터넷 연결을 확인해 주세요.";
+    __DEV__ && console.warn("[Gemini] askGemini 최종 실패", e);
+    const isNetwork = e instanceof TypeError || (e instanceof Error && e.name === "AbortError");
+    return isNetwork ? "인터넷 연결을 확인해 주세요." : "지금 답변이 어려워요. 잠시 후 다시 말씀해 주세요.";
   }
 }
 
 // ─── 인텐트 분류 ─────────────────────────────────────────────────────────────
-export async function parseIntent(utterance: string): Promise<ParsedIntent> {
+export async function parseIntent(
+  utterance: string,
+  opts?: { onRetry?: () => void }
+): Promise<ParsedIntent> {
   if (!GEMINI_KEY) {
     __DEV__ && console.warn("[Gemini] API 키가 없습니다. EXPO_PUBLIC_GEMINI_API_KEY 확인");
     return { intent: "unknown" };
   }
 
   try {
-    const res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const res = await geminiPost({
+      body: {
         contents: [{ parts: [{ text: `아래 발화의 의도를 분류해서 JSON 하나만 출력해라. 다른 텍스트는 절대 출력하지 마라.
 
 발화: "${utterance}"
@@ -269,12 +309,13 @@ export async function parseIntent(utterance: string): Promise<ParsedIntent> {
 - "살려줘" → {"intent":"sos"}
 - "오늘 날씨 어때?" → {"intent":"general_question"}` }] }],
         generationConfig: { temperature: 0 },
-      }),
+      },
+      timeoutMs: 8_000,
+      onRetry: opts?.onRetry,
     });
 
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      __DEV__ && console.warn(`[Gemini] parseIntent HTTP ${res.status}`, body.slice(0, 200));
+      __DEV__ && console.warn(`[Gemini] parseIntent HTTP ${res.status}`);
       return { intent: "unknown" };
     }
 
