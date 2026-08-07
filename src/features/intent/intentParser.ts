@@ -58,64 +58,36 @@ const EMOJI_MAP: Record<string, string> = {
   "com.samsung.android.spay": "💳", "com.sec.android.app.shealth": "❤️",
 };
 
-/**
- * 설치된 앱 목록 + 사용자 발화를 Gemini에 보내 패키지명을 매칭.
- * "제미나이" → "Gemini", "신한은행" → "신한 SOL뱅크" 같은 언어·표기 차이를 NLU로 해결.
- */
-async function geminiMatchApp(appName: string, apps: RawApp[]): Promise<RawApp[]> {
-  if (!GEMINI_KEY || apps.length === 0) return [];
-  const list = apps.map((a) => `${a.label}|${a.packageName}`).join("\n");
-  try {
-    const res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `설치된 앱 목록에서 사용자가 원하는 앱을 찾아라. JSON만 출력해라. 다른 텍스트 없음.
-
-사용자: "${appName}"
-
-앱 목록 (이름|패키지명):
-${list}
-
-규칙:
-- "신한은행" → "신한 SOL뱅크" 같은 레이블 차이도 매칭
-- "제미나이" → "Gemini" 같은 언어 차이도 매칭
-- "KB" "KB앱" 처럼 여러 앱이 해당하면 전부 포함
-- 해당 없으면 빈 배열
-
-{"matches":["패키지명1","패키지명2"]}` }] }],
-        generationConfig: { temperature: 0 },
-      }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const parsed = JSON.parse(text.replace(/```json|```/g, "").trim()) as { matches: string[] };
-    return parsed.matches
-      .map((pkg) => apps.find((a) => a.packageName === pkg))
-      .filter((a): a is RawApp => a !== undefined);
-  } catch {
-    return [];
-  }
+function norm(s: string) {
+  return s.replace(/\s/g, "").toLowerCase();
 }
 
-/** Gemini NLU 매칭으로 앱 실행 */
+/** package_name 모를 때 설치 앱 레이블 로컬 매칭 (API 호출 없음) */
+function localMatchApps(appName: string, apps: RawApp[]): RawApp[] {
+  const q = norm(appName);
+  const exact = apps.filter((a) => norm(a.label) === q);
+  if (exact.length > 0) return exact;
+  return apps.filter((a) => {
+    const nl = norm(a.label);
+    return nl.includes(q) || q.includes(nl);
+  });
+}
+
 export async function openAppByName(
   appName: string,
   packageName?: string,
 ): Promise<OpenAppResult> {
-  const apps = await getInstalledApps();
-
-  // 1순위: Gemini가 packageName을 이미 알고 있고 실제 설치된 경우
-  if (packageName && apps.some((a) => a.packageName === packageName)) {
+  // 1순위: parseIntent가 package_name을 이미 알면 바로 실행
+  if (packageName) {
     try {
       await InstalledApps.launch(packageName);
       return { status: "opened" };
-    } catch { /* 미설치·실패 → 아래로 */ }
+    } catch { /* 미설치 → 아래로 */ }
   }
 
-  // 2순위: Gemini가 앱 목록 보고 NLU 매칭
-  const matched = await geminiMatchApp(appName, apps);
+  // 2순위: 설치 앱 레이블 로컬 매칭 (API 호출 없음)
+  const apps = await getInstalledApps();
+  const matched = localMatchApps(appName, apps);
   if (matched.length === 0) return { status: "not_found" };
 
   if (matched.length === 1) {
@@ -197,7 +169,7 @@ export async function parseIntent(utterance: string): Promise<ParsedIntent> {
 1. 장소·가게·업체 검색 → search_business. business_query: 카카오맵에 넣을 최적 검색어. 특정 메뉴명(파닭·마라탕)이 있으면 그것만 사용. 지역명 있으면 "지역명 업종" 형태로 합침. 수식어·동사 제거.
 2. 특정인에게 전화 → call_contact
 3. 약 복용 알림 설정 → set_reminder
-4. 앱 실행 요청(켜줘·열어줘·실행해줘) → open_app. app_name: 앱 이름만. package_name: 안드로이드 패키지명(아는 경우만, 모르면 빈 문자열).
+4. 앱 실행 요청(켜줘·열어줘·실행해줘) → open_app. app_name: 앱 이름만. package_name: 안드로이드 패키지명. 네 학습 데이터로 아는 앱이면 반드시 반환. 정말 알 수 없을 때만 빈 문자열.
 5. 신체 이상·안전 우려 발언 → safety_concern. 카테고리: fall_risk(넘어짐/쓰러짐) | medication_concern(약 못 먹음) | nutrition_concern(밥 못 먹음) | mental_health_concern(우울/외로움) | mobility_concern(걷기 힘듦) | social_isolation(아무도 안 옴) | urgent_medical(응급).
 6. 위험·구조 요청 → sos
 7. 위 외의 모든 질문 → general_question
@@ -218,18 +190,31 @@ export async function parseIntent(utterance: string): Promise<ParsedIntent> {
 - "딸한테 전화해줘" → {"intent":"call_contact","contact_name":"딸"}
 - "근처 치킨집 찾아줘" → {"intent":"search_business","business_query":"치킨"}
 - "유튜브 켜줘" → {"intent":"open_app","app_name":"유튜브","package_name":"com.google.android.youtube"}
+- "인스타 켜줘" → {"intent":"open_app","app_name":"인스타","package_name":"com.instagram.android"}
 - "카카오톡 열어줘" → {"intent":"open_app","app_name":"카카오톡","package_name":"com.kakao.talk"}
 - "카카오뱅크 켜줘" → {"intent":"open_app","app_name":"카카오뱅크","package_name":"com.kakaobank.channel"}
 - "카카오페이 켜줘" → {"intent":"open_app","app_name":"카카오페이","package_name":"com.kakaopay.app"}
 - "KB페이 켜줘" → {"intent":"open_app","app_name":"KB페이","package_name":"com.kbstar.kbpay"}
 - "KB국민은행 켜줘" → {"intent":"open_app","app_name":"KB국민은행","package_name":"com.kbstar.kbbank"}
+- "국민은행 켜줘" → {"intent":"open_app","app_name":"국민은행","package_name":"com.kbstar.kbbank"}
 - "토스 열어줘" → {"intent":"open_app","app_name":"토스","package_name":"viva.republica.toss"}
 - "배달의민족 켜줘" → {"intent":"open_app","app_name":"배달의민족","package_name":"com.nhncorp.deliveryhero.android"}
+- "배민 켜줘" → {"intent":"open_app","app_name":"배민","package_name":"com.nhncorp.deliveryhero.android"}
 - "넷플릭스 켜줘" → {"intent":"open_app","app_name":"넷플릭스","package_name":"com.netflix.mediaclient"}
 - "신한은행 켜줘" → {"intent":"open_app","app_name":"신한은행","package_name":"com.shinhan.sbanking"}
 - "농협은행 켜줘" → {"intent":"open_app","app_name":"농협은행","package_name":"nh.smart"}
+- "하나은행 켜줘" → {"intent":"open_app","app_name":"하나은행","package_name":"com.kebhana.hanapay"}
+- "우리은행 켜줘" → {"intent":"open_app","app_name":"우리은행","package_name":"com.wooribank.pib.smart"}
 - "쿠팡 켜줘" → {"intent":"open_app","app_name":"쿠팡","package_name":"com.coupang.mobile"}
 - "삼성페이 켜줘" → {"intent":"open_app","app_name":"삼성페이","package_name":"com.samsung.android.spay"}
+- "네이버 켜줘" → {"intent":"open_app","app_name":"네이버","package_name":"com.nhn.android.search"}
+- "네이버지도 켜줘" → {"intent":"open_app","app_name":"네이버지도","package_name":"com.nhn.android.nmap"}
+- "카카오맵 켜줘" → {"intent":"open_app","app_name":"카카오맵","package_name":"net.daum.android.map"}
+- "제미나이 켜줘" → {"intent":"open_app","app_name":"제미나이","package_name":"com.google.android.apps.bard"}
+- "챗지피티 켜줘" → {"intent":"open_app","app_name":"챗지피티","package_name":"com.openai.chatgpt"}
+- "지피티 켜줘" → {"intent":"open_app","app_name":"지피티","package_name":"com.openai.chatgpt"}
+- "당근 켜줘" → {"intent":"open_app","app_name":"당근","package_name":"com.towneers.www"}
+- "당근마켓 켜줘" → {"intent":"open_app","app_name":"당근마켓","package_name":"com.towneers.www"}
 - "KB 켜줘" → {"intent":"open_app","app_name":"KB","package_name":""}
 - "카카오 켜줘" → {"intent":"open_app","app_name":"카카오","package_name":""}
 - "아까 넘어졌어" → {"intent":"safety_concern","safety_category":"fall_risk"}

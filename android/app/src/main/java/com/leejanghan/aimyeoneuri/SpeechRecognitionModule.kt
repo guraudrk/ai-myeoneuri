@@ -36,7 +36,9 @@ class SpeechRecognitionModule(private val reactContext: ReactApplicationContext)
                 return@post
             }
 
+            recognizer?.cancel()
             recognizer?.destroy()
+            recognizer = null
             recognizer = SpeechRecognizer.createSpeechRecognizer(reactContext)
             recognizer?.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {}
