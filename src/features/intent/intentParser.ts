@@ -1,4 +1,4 @@
-import { Alert, Linking, NativeModules } from "react-native";
+import { Alert, NativeModules } from "react-native";
 
 const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? "";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
@@ -49,79 +49,78 @@ async function getInstalledApps(): Promise<RawApp[]> {
   return _appsCache ?? [];
 }
 
-// 한국어 속어·별칭 → 설치 앱 레이블 정규화 검색어
-const ALIASES: Record<string, string> = {
-  // AI 앱
-  지피티: "chatgpt", 챗지피티: "chatgpt", "챗gpt": "chatgpt", 클로드: "claude",
-  // 금융 — 레이블 불일치 보완
-  kb은행: "kb국민은행", kb뱅크: "kb국민은행", 국민은행: "kb국민은행",
-  농협: "nh농협은행", 농협은행: "nh농협은행",
-  기업은행: "ibk기업은행",
-  // 쇼핑·배달
-  배민: "배달의민족", 당근: "당근마켓", 컬리: "마켓컬리",
-  // 지도
-  지맵: "카카오맵", "t맵": "티맵",
-};
-
 // 앱별 이모지 (picker UI용)
 const EMOJI_MAP: Record<string, string> = {
   "com.kakao.talk": "💬", "com.kakaopay.app": "💛", "com.kakaobank.channel": "🏦",
-  "com.kbstar.kbbank": "🏦", "com.kbstar.kbpay": "💳", "com.kbstar.liivmate": "📈",
-  "viva.republica.toss": "💸", "com.nhn.android.search": "🔍",
-  "com.nhn.android.nmap": "🗺️", "com.google.android.apps.maps": "🗺️",
+  "com.kbstar.kbbank": "🏦", "com.kbstar.kbpay": "💳", "viva.republica.toss": "💸",
+  "com.nhn.android.search": "🔍", "com.nhn.android.nmap": "🗺️",
   "com.netflix.mediaclient": "🎬", "com.coupang.mobile": "🛍️",
   "com.samsung.android.spay": "💳", "com.sec.android.app.shealth": "❤️",
 };
 
-// canOpenURL이 작동하는 커스텀 URI 스킴만 유지 (intent: 계열 제외)
-const URI_SCHEMES: Record<string, string> = {
-  유튜브: "vnd.youtube:",
-  카카오맵: "kakaomap://",
-  지도: "kakaomap://",
-  네이버지도: "nmap://",
-};
+/**
+ * 설치된 앱 목록 + 사용자 발화를 Gemini에 보내 패키지명을 매칭.
+ * "제미나이" → "Gemini", "신한은행" → "신한 SOL뱅크" 같은 언어·표기 차이를 NLU로 해결.
+ */
+async function geminiMatchApp(appName: string, apps: RawApp[]): Promise<RawApp[]> {
+  if (!GEMINI_KEY || apps.length === 0) return [];
+  const list = apps.map((a) => `${a.label}|${a.packageName}`).join("\n");
+  try {
+    const res = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `설치된 앱 목록에서 사용자가 원하는 앱을 찾아라. JSON만 출력해라. 다른 텍스트 없음.
 
-function norm(s: string) {
-  return s.replace(/\s/g, "").toLowerCase();
+사용자: "${appName}"
+
+앱 목록 (이름|패키지명):
+${list}
+
+규칙:
+- "신한은행" → "신한 SOL뱅크" 같은 레이블 차이도 매칭
+- "제미나이" → "Gemini" 같은 언어 차이도 매칭
+- "KB" "KB앱" 처럼 여러 앱이 해당하면 전부 포함
+- 해당 없으면 빈 배열
+
+{"matches":["패키지명1","패키지명2"]}` }] }],
+        generationConfig: { temperature: 0 },
+      }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const parsed = JSON.parse(text.replace(/```json|```/g, "").trim()) as { matches: string[] };
+    return parsed.matches
+      .map((pkg) => apps.find((a) => a.packageName === pkg))
+      .filter((a): a is RawApp => a !== undefined);
+  } catch {
+    return [];
+  }
 }
 
-/** 설치 앱 목록에서 퍼지 매칭 후 실행 */
+/** Gemini NLU 매칭으로 앱 실행 */
 export async function openAppByName(
   appName: string,
   packageName?: string,
 ): Promise<OpenAppResult> {
-  const normName = norm(appName);
+  const apps = await getInstalledApps();
 
-  // 1순위: 커스텀 URI 스킴 (유튜브·카카오맵 등 — canOpenURL 신뢰 가능)
-  const schemeKey = Object.keys(URI_SCHEMES).find((k) => norm(k) === normName);
-  if (schemeKey) {
-    const url = URI_SCHEMES[schemeKey];
-    const can = await Linking.canOpenURL(url).catch(() => false);
-    if (can) { await Linking.openURL(url); return { status: "opened" }; }
-  }
-
-  // 2순위: Gemini가 packageName을 이미 알고 있는 경우 → getLaunchIntentForPackage
-  if (packageName) {
+  // 1순위: Gemini가 packageName을 이미 알고 있고 실제 설치된 경우
+  if (packageName && apps.some((a) => a.packageName === packageName)) {
     try {
       await InstalledApps.launch(packageName);
       return { status: "opened" };
-    } catch { /* 미설치 → 아래로 */ }
+    } catch { /* 미설치·실패 → 아래로 */ }
   }
 
-  // 3순위: 설치 앱 목록 퍼지 매칭
-  const search = ALIASES[normName] ?? normName;
-  const apps = await getInstalledApps();
+  // 2순위: Gemini가 앱 목록 보고 NLU 매칭
+  const matched = await geminiMatchApp(appName, apps);
+  if (matched.length === 0) return { status: "not_found" };
 
-  const matches = apps.filter((a) => {
-    const nl = norm(a.label);
-    return nl === search || nl.includes(search) || search.includes(nl);
-  });
-
-  if (matches.length === 0) return { status: "not_found" };
-
-  if (matches.length === 1) {
+  if (matched.length === 1) {
     try {
-      await InstalledApps.launch(matches[0].packageName);
+      await InstalledApps.launch(matched[0].packageName);
       return { status: "opened" };
     } catch {
       return { status: "not_found" };
@@ -131,7 +130,7 @@ export async function openAppByName(
   // 복수 매칭 → 선택 picker
   return {
     status: "ambiguous",
-    candidates: matches.slice(0, 5).map((a) => ({
+    candidates: matched.slice(0, 5).map((a) => ({
       name: a.label,
       packageName: a.packageName,
       emoji: EMOJI_MAP[a.packageName] ?? "📱",
