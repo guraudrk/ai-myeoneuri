@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
@@ -89,11 +89,12 @@ export function OnboardingScreen({ onDone }: Props) {
     }
   }
 
+  // 구글 OAuth 완료 후 session은 _layout.tsx Linking 리스너가 code 교환 → onAuthStateChange 발화
   async function handleGoogleLogin() {
     setError("");
     setLoading(true);
     try {
-      const redirectTo = Linking.createURL("/auth-callback");
+      const redirectTo = Linking.createURL("auth-callback");
       const { data, error: oauthErr } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo, skipBrowserRedirect: true },
@@ -102,30 +103,27 @@ export function OnboardingScreen({ onDone }: Props) {
         setError("구글 로그인을 시작할 수 없어요.");
         return;
       }
-
-      const result = await WebBrowser.openAuthSessionAsync(data.url, Linking.createURL("/"));
-      if (result.type !== "success") return;
-
-      const parsed = Linking.parse(result.url);
-      const code = parsed.queryParams?.code as string | undefined;
-      if (!code) {
-        setError("구글 인증에 실패했어요. 다시 시도해 주세요.");
-        return;
-      }
-
-      const { data: session, error: sessionErr } = await supabase.auth.exchangeCodeForSession(code);
-      if (sessionErr || !session.user) {
-        setError("구글 로그인에 실패했어요. 다시 시도해 주세요.");
-        return;
-      }
-
-      await afterLogin();
+      await WebBrowser.openBrowserAsync(data.url);
     } catch {
       setError("인터넷 연결을 확인해 주세요.");
     } finally {
       setLoading(false);
     }
   }
+
+  // _layout.tsx가 code를 교환하면 세션이 생기고, 여기서 감지해 select 단계로 이동
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session) {
+          setLoading(true);
+          await afterLogin();
+          setLoading(false);
+        }
+      }
+    );
+    return () => subscription.unsubscribe();
+  }, []);
 
   // ── 환영 ──────────────────────────────────────────────────────────────────
   if (step === "welcome") {
