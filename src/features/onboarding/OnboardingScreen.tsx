@@ -20,6 +20,7 @@ type Step = "welcome" | "login" | "select";
 interface ParentProfileRow {
   id: string;
   display_name: string;
+  phone: string | null;
 }
 
 interface Props {
@@ -35,6 +36,7 @@ export function OnboardingScreen({ onDone }: Props) {
   const [elders, setElders]     = useState<ParentProfileRow[]>([]);
 
   async function finish(linked: boolean, elderId?: string, elderName?: string) {
+    setLoading(true);
     await saveLinkData(
       linked && elderId && elderName
         ? { linked: true, elderId, elderName }
@@ -47,7 +49,7 @@ export function OnboardingScreen({ onDone }: Props) {
   async function afterLogin(): Promise<boolean> {
     const { data: profiles, error: profileErr } = await supabase
       .from("parent_profiles")
-      .select("id, display_name")
+      .select("id, display_name, phone")
       .order("created_at", { ascending: false });
 
     if (profileErr) {
@@ -269,11 +271,15 @@ export function OnboardingScreen({ onDone }: Props) {
         <ScrollView contentContainerStyle={s.selectBody}>
           <Text style={s.selectTitle}>{"어르신을\n선택해 주세요"}</Text>
 
-          {elders.map((elder) => (
+          {loading && (
+            <ActivityIndicator size="large" color={Colors.primary} style={{ marginVertical: 24 }} />
+          )}
+
+          {!loading && elders.map((elder) => (
             <TouchableOpacity
               key={elder.id}
               style={[s.elderCard, Shadow.card]}
-              onPress={() => finish(true, elder.id, elder.display_name)}
+              onPress={() => { void finish(true, elder.id, elder.display_name); }}
               activeOpacity={0.75}
             >
               <View style={s.elderAvatar}>
@@ -281,14 +287,21 @@ export function OnboardingScreen({ onDone }: Props) {
                   {elder.display_name?.[0] ?? "?"}
                 </Text>
               </View>
-              <Text style={s.elderName}>{elder.display_name}</Text>
+              <View style={s.elderInfo}>
+                <Text style={s.elderName}>{elder.display_name}</Text>
+                {elder.phone ? (
+                  <Text style={s.elderPhone}>{elder.phone}</Text>
+                ) : null}
+              </View>
               <Text style={s.elderChevron}>›</Text>
             </TouchableOpacity>
           ))}
 
-          <TouchableOpacity style={s.ghostBtn} onPress={() => finish(false)}>
-            <Text style={s.ghostBtnText}>취소</Text>
-          </TouchableOpacity>
+          {!loading && (
+            <TouchableOpacity style={s.ghostBtn} onPress={() => { void finish(false); }}>
+              <Text style={s.ghostBtnText}>취소</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -410,7 +423,9 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: Colors.primary,
   },
-  elderName:    { flex: 1, fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
+  elderInfo:    { flex: 1, gap: 2 },
+  elderName:    { fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
+  elderPhone:   { fontSize: FontSize.caption, color: Colors.textMuted },
   elderChevron: { fontSize: 24, color: Colors.textMuted },
 
   // ── 공용 ──
