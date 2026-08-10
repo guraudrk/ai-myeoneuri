@@ -1,6 +1,4 @@
-import { useState, useRef, useMemo, useEffect, useCallback } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { OnboardingScreen, ONBOARDING_KEY } from "@/features/onboarding/OnboardingScreen";
+import { useState, useRef, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -88,19 +86,6 @@ type ScreenState =
   | { type: "relationship_picker"; relationship: string; allContacts: ContactCandidate[] };
 
 export default function HomeScreen() {
-  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    AsyncStorage.getItem(ONBOARDING_KEY).then((val) => setOnboardingDone(!!val));
-  }, []);
-
-  const handleOnboardingDone = useCallback(() => {
-    setOnboardingDone(true);
-  }, []);
-
-  if (onboardingDone === null) return null; // AsyncStorage 읽기 전
-  if (!onboardingDone) return <OnboardingScreen onDone={handleOnboardingDone} />;
-
   const [input, setInput]               = useState("");
   const [screen, setScreen]             = useState<ScreenState>({ type: "idle" });
   const [isListening, setIsListening]   = useState(false);
