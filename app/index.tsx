@@ -40,14 +40,6 @@ import {
   removeFavorite,
   type FavoriteContact,
 } from "@/features/favorites/FavoritesAdapter";
-import {
-  getReminders,
-  addReminder,
-  removeReminder,
-  setupNotificationChannel,
-  requestNotificationPermission,
-  type Reminder,
-} from "@/features/reminders/ReminderService";
 import type { ContactCandidate } from "@/domain/types";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
 
@@ -90,20 +82,14 @@ export default function HomeScreen() {
   const [screen, setScreen]             = useState<ScreenState>({ type: "idle" });
   const [isListening, setIsListening]   = useState(false);
   const [favorites, setFavorites]       = useState<FavoriteContact[]>([]);
-  const [reminders, setReminders]       = useState<Reminder[]>([]);
   const [todayLogs, setTodayLogs]       = useState<LogEntry[]>([]);
-  const [showReminderModal, setShowReminderModal] = useState(false);
-  const [showTextInput, setShowTextInput]         = useState(false);
-  const [reminderMedicine, setReminderMedicine]   = useState("");
-  const [reminderTime, setReminderTime]           = useState("08:00");
-  const [searchingMsg, setSearchingMsg]           = useState("찾고 있어요…");
+  const [showTextInput, setShowTextInput] = useState(false);
+  const [searchingMsg, setSearchingMsg]   = useState("찾고 있어요…");
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    setupNotificationChannel().catch(() => {});
     loadFavorites();
-    loadReminders();
     loadTodayLogs();
     return () => { ttsStop(); };
   }, []);
@@ -122,7 +108,6 @@ export default function HomeScreen() {
   }, [screen.type]);
 
   async function loadFavorites() { setFavorites(await getFavorites()); }
-  async function loadReminders() { setReminders(await getReminders()); }
   async function loadTodayLogs() { setTodayLogs(await getTodayLogs()); }
 
   async function handleSearch(utterance?: string) {
@@ -138,14 +123,6 @@ export default function HomeScreen() {
     });
 
     if (parsed.intent === "sos") { setScreen({ type: "idle" }); handleSOS(); return; }
-
-    if (parsed.intent === "set_reminder") {
-      setScreen({ type: "idle" });
-      if (parsed.medicineName) setReminderMedicine(parsed.medicineName);
-      if (parsed.timeHHMM)    setReminderTime(parsed.timeHHMM);
-      setShowReminderModal(true);
-      return;
-    }
 
     if (parsed.intent === "open_app") {
       const result = await openAppByName(parsed.appName, parsed.packageName);
@@ -178,7 +155,6 @@ export default function HomeScreen() {
         onRetry: () => setSearchingMsg("조금만 기다려 주세요…"),
       });
       setScreen({ type: "general_answer", question: parsed.utterance, answer });
-      // prepareForSpeech가 마크다운 제거 + 4문장 제한을 내부에서 처리
       speak(answer).catch(() => {});
       await addLog("💬", parsed.utterance.slice(0, 24));
       loadTodayLogs();
@@ -205,7 +181,6 @@ export default function HomeScreen() {
       if (result.status === "permission_denied") {
         setScreen({ type: "permission_denied", reason: "contacts" });
       } else if (result.status === "unmapped_relationship") {
-        // 서비스 필터를 우회해 전체 연락처를 어댑터에서 직접 가져옴 (빈 쿼리는 필터가 모두 걸러버림)
         const all = await contactsAdapter.searchContacts("");
         setScreen({ type: "relationship_picker", relationship: result.relationship, allContacts: all });
       } else if (result.status === "no_results") {
@@ -220,7 +195,6 @@ export default function HomeScreen() {
     if (result.status === "permission_denied") {
       setScreen({ type: "permission_denied", reason: "contacts" });
     } else if (result.status === "unmapped_relationship") {
-      // 서비스 필터를 우회해 전체 연락처를 어댑터에서 직접 가져옴
       const all = await contactsAdapter.searchContacts("");
       setScreen({ type: "relationship_picker", relationship: result.relationship, allContacts: all });
     } else if (result.status === "no_results") {
@@ -296,21 +270,6 @@ export default function HomeScreen() {
     setFavorites(await getFavorites());
   }
 
-  async function handleSaveReminder() {
-    if (!reminderMedicine.trim()) { Alert.alert("약 이름을 입력해 주세요"); return; }
-    const granted = await requestNotificationPermission();
-    if (!granted) { Alert.alert("알림 권한이 없어요", "설정 → AI 며느리 → 알림을 허용해 주세요."); return; }
-    await addReminder(reminderMedicine.trim(), reminderTime);
-    setReminders(await getReminders());
-    setShowReminderModal(false);
-    setReminderMedicine("");
-    setReminderTime("08:00");
-    await addLog("💊", `${reminderMedicine.trim()} 알림 ${reminderTime} 설정`);
-    loadTodayLogs();
-    speak(`매일 ${reminderTime}에 ${reminderMedicine} 복용 알림을 설정했어요.`).catch(() => {});
-    Alert.alert("알림 설정 완료", `매일 ${reminderTime}에 ${reminderMedicine} 복용 알림이 울려요.`);
-  }
-
   async function handleRelationshipSelect(relationship: string, candidate: ContactCandidate) {
     await saveMapping(relationship, candidate.id);
     setScreen({ type: "confirming_contact", candidate, requestId: nextRequestId() });
@@ -327,42 +286,11 @@ export default function HomeScreen() {
 
   const isIdle = screen.type === "idle" || screen.type === "no_results" || screen.type === "permission_denied";
 
-  // 연락처 이름 첫 글자 (아바타용)
   function initial(name: string) { return name.trim()[0] ?? "?"; }
 
   return (
     <View style={s.root}>
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
-
-      {/* ─── 약 알림 모달 ─── */}
-      <Modal visible={showReminderModal} transparent animationType="slide">
-        <View style={s.modalOverlay}>
-          <View style={[s.modalCard, Shadow.card]}>
-            <Text style={s.modalTitle}>💊 약 복용 알림 설정</Text>
-            <TextInput
-              style={s.modalInput}
-              value={reminderMedicine}
-              onChangeText={setReminderMedicine}
-              placeholder="약 이름 (예: 혈압약)"
-              placeholderTextColor={Colors.placeholder}
-            />
-            <TextInput
-              style={s.modalInput}
-              value={reminderTime}
-              onChangeText={setReminderTime}
-              placeholder="시간 (예: 08:00)"
-              placeholderTextColor={Colors.placeholder}
-              keyboardType="numbers-and-punctuation"
-            />
-            <TouchableOpacity style={[s.primaryBtn, Shadow.button]} onPress={handleSaveReminder}>
-              <Text style={s.primaryBtnText}>매일 알림 설정</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.ghostBtn} onPress={() => setShowReminderModal(false)}>
-              <Text style={s.ghostBtnText}>취소</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* ─── 직접 입력 모달 ─── */}
       <Modal visible={showTextInput} transparent animationType="slide">
@@ -393,8 +321,10 @@ export default function HomeScreen() {
       {isIdle && (
         <View style={s.idleRoot}>
           <SafeAreaView style={s.idleInner}>
-            {/* 상단 뱃지 */}
-            <Text style={s.badge}>AI 며느리</Text>
+            {/* 상단 앱 이름 */}
+            <View style={s.headerRow}>
+              <Text style={s.appName}>AI 며느리</Text>
+            </View>
 
             {/* 인사말 */}
             <Text style={s.heroTitle}>
@@ -406,7 +336,7 @@ export default function HomeScreen() {
               <LargeMicrophoneButton isListening={isListening} onPress={handleMicPress} />
             </View>
 
-            {/* 알림 없음 / 있음 상태 메시지 */}
+            {/* 알림 배지 */}
             {screen.type === "no_results" && (
               <View style={s.noResultBadge}>
                 <Text style={s.noResultText}>🔍 찾을 수 없었어요. 다시 말씀해 주세요.</Text>
@@ -420,10 +350,10 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {/* 즐겨찾기 카드 */}
+            {/* 즐겨찾기 */}
             {favorites.length > 0 && (
               <View style={s.favSection}>
-                <Text style={s.favSectionLabel}>즐겨찾기</Text>
+                <Text style={s.sectionLabel}>즐겨찾기</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.favScroll}>
                   {favorites.map((fav) => (
                     <TouchableOpacity
@@ -450,7 +380,7 @@ export default function HomeScreen() {
             {/* 오늘의 기록 */}
             {todayLogs.length > 0 && (
               <View style={s.logSection}>
-                <Text style={s.favSectionLabel}>오늘 한 일</Text>
+                <Text style={s.sectionLabel}>오늘 한 일</Text>
                 {todayLogs.slice(0, 3).map((log) => (
                   <View key={log.id} style={s.logRow}>
                     <Text style={s.logEmoji}>{log.emoji}</Text>
@@ -464,29 +394,13 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {/* 약 알림 있으면 한 줄 표시 */}
-            {reminders.length > 0 && (
-              <View style={s.reminderPill}>
-                <Text style={s.reminderPillText}>
-                  💊 {reminders[0].medicineName} · 매일 {reminders[0].timeHHMM}
-                  {reminders.length > 1 ? ` 외 ${reminders.length - 1}개` : ""}
-                </Text>
-                <TouchableOpacity onPress={() => setShowReminderModal(true)}>
-                  <Text style={s.reminderPillEdit}>편집</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* 하단 액션 */}
+            {/* 하단 버튼 */}
             <View style={s.bottomRow}>
               <TouchableOpacity style={s.sosBtn} onPress={handleSOS} accessibilityLabel="긴급 SOS">
                 <Text style={s.sosBtnText}>🆘  SOS</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.textInputBtn} onPress={() => setShowTextInput(true)}>
                 <Text style={s.textInputBtnText}>⌨️ 직접 입력</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.reminderAddBtn} onPress={() => setShowReminderModal(true)}>
-                <Text style={s.reminderAddBtnText}>💊 알림 추가</Text>
               </TouchableOpacity>
             </View>
           </SafeAreaView>
@@ -531,7 +445,7 @@ export default function HomeScreen() {
                         }}
                       >
                         <Text style={s.appEmoji}>{c.emoji}</Text>
-                        <Text style={s.appName}>{c.name}</Text>
+                        <Text style={s.appLabel}>{c.name}</Text>
                         <Text style={s.appChevron}>›</Text>
                       </TouchableOpacity>
                     ))}
@@ -646,7 +560,7 @@ export default function HomeScreen() {
                     <View style={s.divider} />
                     <Text style={s.answerText}>{stripMarkdown(screen.answer)}</Text>
                     <TouchableOpacity
-                      style={[s.replayBtn]}
+                      style={s.replayBtn}
                       onPress={() => speak(screen.answer).catch(() => {})}
                     >
                       <Text style={s.replayBtnText}>🔊  다시 읽기</Text>
@@ -668,7 +582,7 @@ export default function HomeScreen() {
                   </View>
                 )}
 
-                {/* 관계어 피커 — "어느 분이 '딸'이에요?" */}
+                {/* 관계어 피커 */}
                 {screen.type === "relationship_picker" && (
                   <>
                     <View style={s.relationshipHeader}>
@@ -715,10 +629,10 @@ export default function HomeScreen() {
 
 // ─── 스타일 ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
+  root: { flex: 1, backgroundColor: Colors.surface },
 
   // ── IDLE ──
-  idleRoot:  { flex: 1, backgroundColor: Colors.background },
+  idleRoot:  { flex: 1, backgroundColor: Colors.surface },
   idleInner: {
     flex: 1,
     paddingHorizontal: Spacing.xl,
@@ -727,37 +641,43 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  badge: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    fontWeight: "600",
-    letterSpacing: 3,
+
+  // 헤더
+  headerRow: { alignSelf: "stretch", alignItems: "flex-start" },
+  appName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.primary,
+    letterSpacing: 1.5,
     textTransform: "uppercase",
-    alignSelf: "center",
+    fontFamily: FontFamily.headingMedium,
   },
+
   heroTitle: {
-    fontSize: 38,
+    fontSize: 40,
     fontWeight: "800",
     color: Colors.textPrimary,
     textAlign: "center",
-    lineHeight: 50,
+    lineHeight: 52,
     fontFamily: FontFamily.heading,
   },
   micWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  // 즐겨찾기
-  favSection: { width: "100%", gap: 10 },
-  favSectionLabel: {
+  // 섹션 레이블
+  sectionLabel: {
     fontSize: 12,
     color: Colors.textMuted,
     fontWeight: "600",
-    letterSpacing: 2,
+    letterSpacing: 1.8,
     textTransform: "uppercase",
     marginLeft: 4,
   },
+
+  // 즐겨찾기
+  favSection: { width: "100%", gap: 10 },
   favScroll: { gap: 12, paddingRight: 4 },
   favCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
     borderRadius: Radius.lg,
     paddingVertical: 16,
     paddingHorizontal: 18,
@@ -779,57 +699,30 @@ const s = StyleSheet.create({
   favName: { fontSize: 15, color: Colors.textPrimary, fontWeight: "600", maxWidth: 72, textAlign: "center" },
   favHint: { fontSize: 12, color: Colors.textMuted },
 
-  // 약 알림 한줄
-  reminderPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.pill,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    width: "100%",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  reminderPillText: { fontSize: 14, color: Colors.textSecondary, flex: 1 },
-  reminderPillEdit: { fontSize: 13, color: Colors.accentWarm, fontWeight: "600" },
-
   // 하단 버튼 행
-  bottomRow: { flexDirection: "row", gap: 10, width: "100%" },
+  bottomRow: { flexDirection: "row", gap: 12, width: "100%" },
   sosBtn: {
     flex: 1.3,
     backgroundColor: "#C0392B",
     borderRadius: Radius.pill,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: "center",
   },
-  sosBtnText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
+  sosBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
   textInputBtn: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
     borderRadius: Radius.pill,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  textInputBtnText: { color: Colors.textSecondary, fontSize: 14, fontWeight: "500" },
-  reminderAddBtn: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.pill,
-    paddingVertical: 14,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  reminderAddBtnText: { color: Colors.textSecondary, fontSize: 14, fontWeight: "500" },
+  textInputBtnText: { color: Colors.textSecondary, fontSize: 15, fontWeight: "500" },
 
-  // 에러/알림 배지
+  // 배지
   noResultBadge: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
     borderRadius: Radius.md,
     paddingVertical: 12,
     paddingHorizontal: 20,
@@ -840,21 +733,21 @@ const s = StyleSheet.create({
   noResultText: { color: Colors.textSecondary, fontSize: 14, textAlign: "center" },
 
   // ── 결과 화면 ──
-  resultRoot:  { flex: 1, backgroundColor: Colors.background },
+  resultRoot:  { flex: 1, backgroundColor: Colors.surface },
   resultInner: { padding: Spacing.lg, gap: Spacing.md, paddingTop: (StatusBar.currentHeight ?? 28) + 16 },
 
-  centerFull: { flex: 1, justifyContent: "center", alignItems: "center", gap: Spacing.lg, backgroundColor: Colors.background },
+  centerFull: { flex: 1, justifyContent: "center", alignItems: "center", gap: Spacing.lg, backgroundColor: Colors.surface },
   searchingText: { fontSize: FontSize.body, color: Colors.textSecondary },
 
   sectionTitle: { fontSize: FontSize.headingLarge, fontWeight: "800", color: Colors.textPrimary, marginBottom: Spacing.sm },
 
-  appRow: { backgroundColor: Colors.surface, borderRadius: Radius.md, flexDirection: "row", alignItems: "center", paddingHorizontal: Spacing.md, paddingVertical: 18, gap: Spacing.md },
+  appRow: { backgroundColor: Colors.background, borderRadius: Radius.md, flexDirection: "row", alignItems: "center", paddingHorizontal: Spacing.md, paddingVertical: 18, gap: Spacing.md },
   appEmoji: { fontSize: 28 },
-  appName:  { flex: 1, fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
+  appLabel:  { flex: 1, fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
   appChevron: { fontSize: 24, color: Colors.textMuted },
 
   candidateRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  starBtn:  { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.surface, alignItems: "center", justifyContent: "center" },
+  starBtn:  { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.background, alignItems: "center", justifyContent: "center" },
   starText: { fontSize: 22 },
 
   confirmCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xl, alignItems: "center", gap: Spacing.sm },
