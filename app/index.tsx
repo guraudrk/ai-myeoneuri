@@ -330,7 +330,7 @@ export default function HomeScreen() {
 
   return (
     <View style={s.root}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       {/* ─── 약 알림 모달 ─── */}
       <Modal visible={showReminderModal} transparent animationType="slide">
@@ -712,13 +712,11 @@ export default function HomeScreen() {
 }
 
 // ─── 스타일 ───────────────────────────────────────────────────────────────────
-const NAVY = Colors.navyDeep;
-
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: NAVY },
+  root: { flex: 1, backgroundColor: Colors.background },
 
   // ── IDLE ──
-  idleRoot:  { flex: 1, backgroundColor: NAVY },
+  idleRoot:  { flex: 1, backgroundColor: Colors.background },
   idleInner: {
     flex: 1,
     paddingHorizontal: Spacing.xl,
@@ -729,7 +727,7 @@ const s = StyleSheet.create({
   },
   badge: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
+    color: Colors.textMuted,
     fontWeight: "600",
     letterSpacing: 3,
     textTransform: "uppercase",
@@ -738,7 +736,7 @@ const s = StyleSheet.create({
   heroTitle: {
     fontSize: 38,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: Colors.textPrimary,
     textAlign: "center",
     lineHeight: 50,
     fontFamily: FontFamily.heading,
@@ -749,7 +747,7 @@ const s = StyleSheet.create({
   favSection: { width: "100%", gap: 10 },
   favSectionLabel: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
+    color: Colors.textMuted,
     fontWeight: "600",
     letterSpacing: 2,
     textTransform: "uppercase",
@@ -757,7 +755,7 @@ const s = StyleSheet.create({
   },
   favScroll: { gap: 12, paddingRight: 4 },
   favCard: {
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     paddingVertical: 16,
     paddingHorizontal: 18,
@@ -765,7 +763,7 @@ const s = StyleSheet.create({
     gap: 8,
     minWidth: 88,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: Colors.border,
   },
   favAvatar: {
     width: 52,
@@ -776,22 +774,24 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   favInitial: { fontSize: 22, color: "#FFF", fontWeight: "700" },
-  favName: { fontSize: 15, color: "#FFFFFF", fontWeight: "600", maxWidth: 72, textAlign: "center" },
-  favHint: { fontSize: 12, color: "rgba(255,255,255,0.45)" },
+  favName: { fontSize: 15, color: Colors.textPrimary, fontWeight: "600", maxWidth: 72, textAlign: "center" },
+  favHint: { fontSize: 12, color: Colors.textMuted },
 
   // 약 알림 한줄
   reminderPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: Colors.surface,
     borderRadius: Radius.pill,
     paddingVertical: 10,
     paddingHorizontal: 18,
     width: "100%",
     justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  reminderPillText: { fontSize: 14, color: "rgba(255,255,255,0.6)", flex: 1 },
+  reminderPillText: { fontSize: 14, color: Colors.textSecondary, flex: 1 },
   reminderPillEdit: { fontSize: 13, color: Colors.accentWarm, fontWeight: "600" },
 
   // 하단 버튼 행
@@ -806,34 +806,36 @@ const s = StyleSheet.create({
   sosBtnText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
   textInputBtn: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: Colors.surface,
     borderRadius: Radius.pill,
     paddingVertical: 14,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: Colors.border,
   },
-  textInputBtnText: { color: "rgba(255,255,255,0.65)", fontSize: 14, fontWeight: "500" },
+  textInputBtnText: { color: Colors.textSecondary, fontSize: 14, fontWeight: "500" },
   reminderAddBtn: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: Colors.surface,
     borderRadius: Radius.pill,
     paddingVertical: 14,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: Colors.border,
   },
-  reminderAddBtnText: { color: "rgba(255,255,255,0.65)", fontSize: 14, fontWeight: "500" },
+  reminderAddBtnText: { color: Colors.textSecondary, fontSize: 14, fontWeight: "500" },
 
   // 에러/알림 배지
   noResultBadge: {
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     paddingVertical: 12,
     paddingHorizontal: 20,
     width: "100%",
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  noResultText: { color: "rgba(255,255,255,0.7)", fontSize: 14, textAlign: "center" },
+  noResultText: { color: Colors.textSecondary, fontSize: 14, textAlign: "center" },
 
   // ── 결과 화면 ──
   resultRoot:  { flex: 1, backgroundColor: Colors.background },
@@ -883,8 +885,8 @@ const s = StyleSheet.create({
   logSection: { width: "100%", gap: 8 },
   logRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, paddingHorizontal: 4 },
   logEmoji: { fontSize: 18, width: 26 },
-  logText:  { flex: 1, fontSize: 14, color: "rgba(255,255,255,0.65)" },
-  logTime:  { fontSize: 12, color: "rgba(255,255,255,0.35)" },
+  logText:  { flex: 1, fontSize: 14, color: Colors.textSecondary },
+  logTime:  { fontSize: 12, color: Colors.textMuted },
 
   // 안전 severity 뱃지
   severityPill: { borderRadius: Radius.pill, paddingVertical: 4, paddingHorizontal: 14, marginBottom: 4 },

@@ -149,7 +149,7 @@ const s = StyleSheet.create({
     borderRadius: SIZE / 2,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#3D6BFF",
+    shadowColor: "#2E5BFF",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.5,
     shadowRadius: 28,
@@ -157,7 +157,7 @@ const s = StyleSheet.create({
   },
   label: {
     fontSize: 18,
-    color: "rgba(255,255,255,0.65)",
+    color: Colors.textMuted,
     fontWeight: "500",
     letterSpacing: 0.4,
   },

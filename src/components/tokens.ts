@@ -8,30 +8,31 @@ const BASE_WIDTH = 390;                                          // Galaxy S24 �
 const s = (n: number) =>
   Math.round(n * Math.min(Math.max(width / BASE_WIDTH, 0.85), 1.1));
 
+// SilverLink 디자인 시스템과 동일한 팔레트 (--sl-* 변수 기준)
 export const Colors = {
-  background:       "#F5F6FA",
+  background:       "#F5F7FB",   // --sl-bg
   surface:          "#FFFFFF",
-  surfaceSecondary: "#EEF3FF",   // 전화번호 박스 — 카드와 명확히 구분
-  border:           "#E5E8EB",   // 구분선 (기존 유지)
+  surfaceSecondary: "#EEF2FF",   // --sl-primary-tint
+  border:           "#E7EBF3",   // --sl-border
 
-  textPrimary:      "#111827",
-  textSecondary:    "#374151",
-  textMuted:        "#6B7280",
-  placeholder:      "#CBD5E1",
+  textPrimary:      "#101828",   // --sl-ink
+  textSecondary:    "#344054",   // --sl-body-strong
+  textMuted:        "#667085",   // --sl-muted
+  placeholder:      "#98A2B3",   // --sl-placeholder
 
-  primary:          "#3D6BFF",   // 더 따뜻하고 생동감 있는 블루
-  primaryDeep:      "#2748C7",   // 강조 텍스트 / 프레스 상태
-  primaryTint:      "#E8EEFF",   // 아이콘 배경 / 답변 카드 배경
-  accentWarm:       "#FFC531",   // 카카오 스타일 포인트 (마이크 링, 뱃지)
+  primary:          "#2E5BFF",   // --sl-primary
+  primaryDeep:      "#234AE0",   // --sl-primary-hover
+  primaryTint:      "#EEF2FF",   // --sl-primary-tint
+  accentWarm:       "#FFC531",   // 마이크 링·포인트 강조 (SilverLink 외)
 
-  navyDeep:         "#25409E",   // 홈 히어로 — 기존보다 밝고 생동감 있게
+  navyDeep:         "#25409E",   // 사용 보류 (이전 홈 배경색)
   navyMid:          "#3E5FC9",
 
-  danger:           "#F0473E",
-  dangerDeep:       "#C7291F",   // 위험 버튼 프레스 / 안전 알림 제목
-  dangerTint:       "#FDEAE9",   // 안전 알림 카드 배경
-  dangerBg:         "#FDEAE9",   // dangerTint 호환 별칭
-  success:          "#12B886",
+  danger:           "#F04438",   // --sl-danger
+  dangerDeep:       "#C7291F",
+  dangerTint:       "#FEF3F2",
+  dangerBg:         "#FEF3F2",
+  success:          "#12B76A",   // --sl-success
   successBg:        "#ECFDF5",
   successText:      "#065F46",
 } as const;
@@ -80,27 +81,27 @@ export const Radius = {
   sm:   10,
   md:   14,
   lg:   20,
-  xl:   28,   // 신규 — 시트 상단 모서리용
+  xl:   28,   // 시트 상단 모서리용
   pill: 100,
 } as const;
 
 export const Shadow = {
   card: {
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowColor: "#101828",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   button: {
-    shadowColor: "#3D6BFF",
+    shadowColor: "#2E5BFF",
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.30,
     shadowRadius: 12,
     elevation: 6,
   },
   mic: {
-    shadowColor: "#3D6BFF",
+    shadowColor: "#2E5BFF",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.40,
     shadowRadius: 24,
