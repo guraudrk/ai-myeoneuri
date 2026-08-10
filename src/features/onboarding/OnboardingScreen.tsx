@@ -5,9 +5,13 @@ import {
   SafeAreaView, StatusBar,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import { Colors, FontFamily, FontSize, TouchSize, Spacing, Radius, Shadow } from "@/components/tokens";
 import { supabase } from "@/features/supabase/supabaseClient";
 import { saveLinkData } from "@/features/supabase/linkService";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export const ONBOARDING_KEY = "onboarding_v1";
 
@@ -40,6 +44,27 @@ export function OnboardingScreen({ onDone }: Props) {
     onDone();
   }
 
+  async function afterLogin(): Promise<boolean> {
+    const { data: profiles, error: profileErr } = await supabase
+      .from("parent_profiles")
+      .select("id, display_name")
+      .order("created_at", { ascending: false });
+
+    if (profileErr) {
+      setError("어르신 목록을 불러오지 못했어요. 다시 시도해 주세요.");
+      await supabase.auth.signOut();
+      return false;
+    }
+    if (!profiles || profiles.length === 0) {
+      setError("SilverLink에 등록된 어르신이 없어요.\nSilverLink 앱에서 먼저 등록해 주세요.");
+      await supabase.auth.signOut();
+      return false;
+    }
+    setElders(profiles as ParentProfileRow[]);
+    setStep("select");
+    return true;
+  }
+
   async function handleLogin() {
     setError("");
     if (!email.trim() || !password) {
@@ -56,25 +81,45 @@ export function OnboardingScreen({ onDone }: Props) {
         setError("이메일 또는 비밀번호를 확인해 주세요.");
         return;
       }
+      await afterLogin();
+    } catch {
+      setError("인터넷 연결을 확인해 주세요.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      const { data: profiles, error: profileErr } = await supabase
-        .from("parent_profiles")
-        .select("id, display_name")
-        .order("created_at", { ascending: false });
-
-      if (profileErr) {
-        setError("어르신 목록을 불러오지 못했어요. 다시 시도해 주세요.");
+  async function handleGoogleLogin() {
+    setError("");
+    setLoading(true);
+    try {
+      const redirectTo = Linking.createURL("/auth-callback");
+      const { data, error: oauthErr } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (oauthErr || !data.url) {
+        setError("구글 로그인을 시작할 수 없어요.");
         return;
       }
 
-      if (!profiles || profiles.length === 0) {
-        setError("SilverLink에 등록된 어르신이 없어요.\nSilverLink 앱에서 먼저 등록해 주세요.");
-        await supabase.auth.signOut();
+      const result = await WebBrowser.openAuthSessionAsync(data.url, Linking.createURL("/"));
+      if (result.type !== "success") return;
+
+      const parsed = Linking.parse(result.url);
+      const code = parsed.queryParams?.code as string | undefined;
+      if (!code) {
+        setError("구글 인증에 실패했어요. 다시 시도해 주세요.");
         return;
       }
 
-      setElders(profiles as ParentProfileRow[]);
-      setStep("select");
+      const { data: session, error: sessionErr } = await supabase.auth.exchangeCodeForSession(code);
+      if (sessionErr || !session.user) {
+        setError("구글 로그인에 실패했어요. 다시 시도해 주세요.");
+        return;
+      }
+
+      await afterLogin();
     } catch {
       setError("인터넷 연결을 확인해 주세요.");
     } finally {
@@ -167,6 +212,20 @@ export function OnboardingScreen({ onDone }: Props) {
               {loading
                 ? <ActivityIndicator color="#FFF" />
                 : <Text style={s.primaryBtnText}>로그인</Text>}
+            </TouchableOpacity>
+
+            <View style={s.dividerRow}>
+              <View style={s.dividerLine} />
+              <Text style={s.dividerText}>또는</Text>
+              <View style={s.dividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={[s.googleBtn, loading && s.btnDisabled]}
+              onPress={handleGoogleLogin}
+              disabled={loading}
+            >
+              <Text style={s.googleBtnText}>🔵  구글로 계속하기</Text>
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
@@ -346,6 +405,34 @@ const s = StyleSheet.create({
     fontWeight: "700",
   },
   btnDisabled: { opacity: 0.6 },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerText: {
+    fontSize: FontSize.caption,
+    color: Colors.textMuted,
+  },
+  googleBtn: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.pill,
+    minHeight: TouchSize.minimum,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  googleBtnText: {
+    fontSize: FontSize.buttonLabel,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+  },
   ghostBtn: {
     minHeight: TouchSize.minimum,
     justifyContent: "center",
