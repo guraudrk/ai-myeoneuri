@@ -35,7 +35,6 @@ describe("localMatchApps()", () => {
   ];
 
   test("정확 일치 반환", () => {
-    const result = localMatchApps("유튜브", apps);
     // "유튜브" vs "youtube" — norm 후 부분 일치: "youtube".includes("유튜브") = false
     // 별도 테스트: 레이블이 정확히 같아야 exact
     const exact = localMatchApps("YouTube", apps);

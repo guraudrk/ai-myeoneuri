@@ -40,6 +40,8 @@ import {
   removeFavorite,
   type FavoriteContact,
 } from "@/features/favorites/FavoritesAdapter";
+import { getLinkData, clearLink, type LinkData } from "@/features/supabase/linkService";
+import { OnboardingScreen } from "@/features/onboarding/OnboardingScreen";
 import type { ContactCandidate } from "@/domain/types";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
 
@@ -83,12 +85,15 @@ export default function HomeScreen() {
   const [todayLogs, setTodayLogs]       = useState<LogEntry[]>([]);
   const [showTextInput, setShowTextInput] = useState(false);
   const [searchingMsg, setSearchingMsg]   = useState("찾고 있어요…");
+  const [showSettings, setShowSettings]   = useState(false);
+  const [linkData, setLinkData]           = useState<LinkData>({ linked: false });
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     loadFavorites();
     loadTodayLogs();
+    getLinkData().then(setLinkData).catch(() => {});
     return () => { ttsStop(); };
   }, []);
 
@@ -295,6 +300,45 @@ export default function HomeScreen() {
     <View style={s.root}>
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
+      {/* ─── 설정 모달: 연결됨 → bottom sheet ─── */}
+      <Modal visible={showSettings && linkData.linked} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={[s.modalCard, Shadow.card]}>
+            <Text style={s.modalTitle}>⚙️ SilverLink 연결</Text>
+            <View style={s.linkStatusBox}>
+              <Text style={s.linkStatusEmoji}>✅</Text>
+              <Text style={s.linkStatusName}>
+                {linkData.linked ? `${linkData.elderName} 어르신` : ""}
+              </Text>
+              <Text style={s.linkStatusDesc}>SilverLink와 연결되어 있어요</Text>
+            </View>
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.danger }]}
+              onPress={async () => {
+                await clearLink();
+                setLinkData({ linked: false });
+                setShowSettings(false);
+              }}
+            >
+              <Text style={s.primaryBtnText}>연결 해제</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.ghostBtn} onPress={() => setShowSettings(false)}>
+              <Text style={s.ghostBtnText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── 설정 모달: 미연결 → 온보딩 full-screen ─── */}
+      <Modal visible={showSettings && !linkData.linked} animationType="slide">
+        <OnboardingScreen
+          onDone={() => {
+            getLinkData().then(setLinkData).catch(() => {});
+            setShowSettings(false);
+          }}
+        />
+      </Modal>
+
       {/* ─── 직접 입력 모달 ─── */}
       <Modal visible={showTextInput} transparent animationType="slide">
         <View style={s.modalOverlay}>
@@ -392,6 +436,13 @@ export default function HomeScreen() {
                 <Text style={s.textInputBtnText}>⌨️ 직접 입력</Text>
               </TouchableOpacity>
             </View>
+
+            {/* 설정 버튼 (자녀용 — 눈에 띄지 않게) */}
+            <TouchableOpacity style={s.settingsBtn} onPress={() => setShowSettings(true)}>
+              <Text style={s.settingsBtnText}>
+                {linkData.linked ? `⚙ ${linkData.elderName} 연결됨` : "⚙ SilverLink 연결"}
+              </Text>
+            </TouchableOpacity>
           </SafeAreaView>
         </View>
       )}
@@ -723,6 +774,33 @@ const s = StyleSheet.create({
     borderColor: Colors.border,
   },
   textInputBtnText: { color: Colors.textSecondary, fontSize: 15, fontWeight: "500" },
+
+  // 설정 버튼 (자녀용)
+  settingsBtn: {
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  settingsBtnText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: "500",
+    letterSpacing: 0.3,
+  },
+
+  // 연결 상태 박스
+  linkStatusBox: {
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    width: "100%",
+    marginBottom: Spacing.sm,
+  },
+  linkStatusEmoji: { fontSize: 32 },
+  linkStatusName:  { fontSize: FontSize.body, fontWeight: "700", color: Colors.textPrimary },
+  linkStatusDesc:  { fontSize: FontSize.caption, color: Colors.textMuted },
 
   // 권한 배지
   permissionBadge: {
