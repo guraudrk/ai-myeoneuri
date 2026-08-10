@@ -37,12 +37,13 @@ export function OnboardingScreen({ onDone }: Props) {
 
   async function finish(linked: boolean, elderId?: string, elderName?: string) {
     setLoading(true);
-    await saveLinkData(
+    // 저장 실패해도 화면 전환은 보장 — 저장은 fire-and-forget
+    saveLinkData(
       linked && elderId && elderName
         ? { linked: true, elderId, elderName }
         : { linked: false }
-    );
-    await AsyncStorage.setItem(ONBOARDING_KEY, "done");
+    ).catch(() => {});
+    AsyncStorage.setItem(ONBOARDING_KEY, "done").catch(() => {});
     onDone();
   }
 
