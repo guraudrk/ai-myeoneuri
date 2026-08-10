@@ -69,12 +69,10 @@ type ScreenState =
   | { type: "business_candidates"; candidates: BusinessCandidate[]; requestId: string; query: string }
   | { type: "confirming_contact"; candidate: ContactCandidate; requestId: string }
   | { type: "confirming_business"; business: BusinessCandidate; requestId: string }
-  | { type: "result"; message: string; isError?: boolean }
   | { type: "general_answer"; question: string; answer: string }
   | { type: "safety_alert"; category: string; severity: SafetySeverity; utterance: string }
   | { type: "app_candidates"; candidates: AppCandidate[]; appFamily: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
-  | { type: "no_results" }
   | { type: "relationship_picker"; relationship: string; allContacts: ContactCandidate[] };
 
 export default function HomeScreen() {
@@ -133,8 +131,8 @@ export default function HomeScreen() {
       } else if (result.status === "ambiguous") {
         setScreen({ type: "app_candidates", candidates: result.candidates, appFamily: parsed.appName });
       } else {
-        Alert.alert("앱을 찾을 수 없어요", `"${parsed.appName}" 앱이 설치되어 있지 않아요.\n앱 스토어에서 설치해 주세요.`, [{ text: "확인" }]);
         setScreen({ type: "idle" });
+        Alert.alert("앱을 찾을 수 없어요", `"${parsed.appName}" 앱이 설치되어 있지 않아요.`);
       }
       return;
     }
@@ -166,10 +164,11 @@ export default function HomeScreen() {
       if (result.status === "location_denied") {
         setScreen({ type: "permission_denied", reason: "location" });
       } else if (result.status === "search_error") {
+        setScreen({ type: "idle" });
         Alert.alert("검색 오류", result.reason);
-        setScreen({ type: "no_results" });
       } else if (result.status === "no_results") {
-        setScreen({ type: "no_results" });
+        setScreen({ type: "idle" });
+        Alert.alert("", "찾을 수 없었어요.\n다시 말씀해 주세요.");
       } else {
         setScreen({ type: "business_candidates", candidates: result.candidates, requestId: nextRequestId(), query: parsed.query });
       }
@@ -184,7 +183,8 @@ export default function HomeScreen() {
         const all = await contactsAdapter.searchContacts("");
         setScreen({ type: "relationship_picker", relationship: result.relationship, allContacts: all });
       } else if (result.status === "no_results") {
-        setScreen({ type: "no_results" });
+        setScreen({ type: "idle" });
+        Alert.alert("", "찾을 수 없었어요.\n다시 말씀해 주세요.");
       } else {
         setScreen({ type: "contact_candidates", candidates: result.candidates, requestId: nextRequestId() });
       }
@@ -198,7 +198,8 @@ export default function HomeScreen() {
       const all = await contactsAdapter.searchContacts("");
       setScreen({ type: "relationship_picker", relationship: result.relationship, allContacts: all });
     } else if (result.status === "no_results") {
-      setScreen({ type: "no_results" });
+      setScreen({ type: "idle" });
+      Alert.alert("", "찾을 수 없었어요.\n다시 말씀해 주세요.");
     } else {
       setScreen({ type: "contact_candidates", candidates: result.candidates, requestId: nextRequestId() });
     }
@@ -223,30 +224,33 @@ export default function HomeScreen() {
   async function handleConfirmContact(candidate: ContactCandidate, requestId: string) {
     const result = await dialContact(requestId, candidate.id, candidate.name, contactsAdapter, phoneAdapter);
     if (result.status === "dialer_opened") {
-      const msg = `${result.contactName} 님께\n전화 화면을 열었어요.`;
-      setScreen({ type: "result", message: msg });
-      speak(`${result.contactName} 님 전화 화면을 열었어요.`).catch(() => {});
       await addLog("📞", `${result.contactName} 님께 전화`);
       loadTodayLogs();
+      handleReset();
     } else if (result.status === "duplicate_blocked") {
-      setScreen({ type: "result", message: "이미 전화 화면을 열었어요." });
+      Alert.alert("", "이미 전화 화면을 열었어요.");
+      handleReset();
     } else {
-      setScreen({ type: "result", message: result.status === "phone_not_found" ? "전화번호를 찾을 수 없어요." : (result as { status: "error"; message: string }).message, isError: true });
+      const msg = result.status === "phone_not_found"
+        ? "전화번호를 찾을 수 없어요."
+        : (result as { status: "error"; message: string }).message;
+      Alert.alert("전화 오류", msg);
+      handleReset();
     }
   }
 
   async function handleConfirmBusiness(business: BusinessCandidate, requestId: string) {
     const result = await dialBusiness(requestId, business, phoneAdapter);
     if (result.status === "dialer_opened") {
-      const msg = `${result.businessName}의\n전화 화면을 열었어요.`;
-      setScreen({ type: "result", message: msg });
-      speak(`${result.businessName} 전화 화면을 열었어요.`).catch(() => {});
       await addLog("🏪", `${result.businessName} 전화`);
       loadTodayLogs();
+      handleReset();
     } else if (result.status === "duplicate_blocked") {
-      setScreen({ type: "result", message: "이미 전화 화면을 열었어요." });
+      Alert.alert("", "이미 전화 화면을 열었어요.");
+      handleReset();
     } else {
-      setScreen({ type: "result", message: (result as { status: "error"; message: string }).message, isError: true });
+      Alert.alert("전화 오류", (result as { status: "error"; message: string }).message);
+      handleReset();
     }
   }
 
@@ -259,7 +263,8 @@ export default function HomeScreen() {
   async function handleFavoriteDial(fav: FavoriteContact) {
     const result = await dialContact(nextRequestId(), fav.id, fav.name, contactsAdapter, phoneAdapter);
     if (result.status === "dialer_opened") {
-      setScreen({ type: "result", message: `${result.contactName} 님께\n전화 화면을 열었어요.` });
+      await addLog("📞", `${result.contactName} 님께 전화`);
+      loadTodayLogs();
     } else {
       Alert.alert("전화 오류", result.status === "phone_not_found" ? "전화번호를 찾을 수 없어요." : "전화 연결에 실패했어요.");
     }
@@ -283,8 +288,6 @@ export default function HomeScreen() {
     ttsStop();
     setScreen({ type: "idle" });
   }
-
-  const isIdle = screen.type === "idle" || screen.type === "no_results" || screen.type === "permission_denied";
 
   function initial(name: string) { return name.trim()[0] ?? "?"; }
 
@@ -318,7 +321,7 @@ export default function HomeScreen() {
       </Modal>
 
       {/* ══════ IDLE 화면 ══════ */}
-      {isIdle && (
+      {screen.type === "idle" && (
         <View style={s.idleRoot}>
           <SafeAreaView style={s.idleInner}>
             {/* 상단 앱 이름 */}
@@ -335,20 +338,6 @@ export default function HomeScreen() {
             <View style={s.micWrap}>
               <LargeMicrophoneButton isListening={isListening} onPress={handleMicPress} />
             </View>
-
-            {/* 알림 배지 */}
-            {screen.type === "no_results" && (
-              <View style={s.noResultBadge}>
-                <Text style={s.noResultText}>🔍 찾을 수 없었어요. 다시 말씀해 주세요.</Text>
-              </View>
-            )}
-            {screen.type === "permission_denied" && (
-              <View style={s.noResultBadge}>
-                <Text style={s.noResultText}>
-                  {screen.reason === "contacts" ? "🔒 연락처 권한이 없어요." : "🔒 위치 권한이 없어요."}
-                </Text>
-              </View>
-            )}
 
             {/* 즐겨찾기 */}
             {favorites.length > 0 && (
@@ -407,6 +396,32 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* ══════ 권한 없음 ══════ */}
+      {screen.type === "permission_denied" && (
+        <View style={s.idleRoot}>
+          <SafeAreaView style={s.idleInner}>
+            <View style={s.headerRow}><Text style={s.appName}>AI 며느리</Text></View>
+            <Text style={s.heroTitle}>무엇을{"\n"}도와드릴까요?</Text>
+            <View style={s.micWrap}>
+              <LargeMicrophoneButton isListening={false} onPress={handleMicPress} />
+            </View>
+            <View style={s.permissionBadge}>
+              <Text style={s.permissionText}>
+                {screen.reason === "contacts" ? "🔒 연락처 권한이 없어요.\n설정에서 허용해 주세요." : "🔒 위치 권한이 없어요.\n설정에서 허용해 주세요."}
+              </Text>
+            </View>
+            <View style={s.bottomRow}>
+              <TouchableOpacity style={s.sosBtn} onPress={handleSOS}>
+                <Text style={s.sosBtnText}>🆘  SOS</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.textInputBtn} onPress={() => setShowTextInput(true)}>
+                <Text style={s.textInputBtnText}>⌨️ 직접 입력</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
+      )}
+
       {/* ══════ 검색 중 ══════ */}
       {screen.type === "searching" && (
         <View style={s.centerFull}>
@@ -423,8 +438,7 @@ export default function HomeScreen() {
         screen.type === "general_answer" ||
         screen.type === "safety_alert" ||
         screen.type === "app_candidates" ||
-        screen.type === "relationship_picker" ||
-        screen.type === "result") && (
+        screen.type === "relationship_picker") && (
         <View style={s.resultRoot}>
           <SafeAreaView style={{ flex: 1 }}>
             <ScrollView contentContainerStyle={s.resultInner}>
@@ -441,7 +455,7 @@ export default function HomeScreen() {
                         onPress={async () => {
                           const r = await openAppByName(c.name, c.packageName);
                           if (r.status === "opened") handleReset();
-                          else Alert.alert("설치되어 있지 않아요", `"${c.name}" 앱이 이 폰에 없어요.`, [{ text: "확인" }]);
+                          else Alert.alert("설치되어 있지 않아요", `"${c.name}" 앱이 이 폰에 없어요.`);
                         }}
                       >
                         <Text style={s.appEmoji}>{c.emoji}</Text>
@@ -449,6 +463,9 @@ export default function HomeScreen() {
                         <Text style={s.appChevron}>›</Text>
                       </TouchableOpacity>
                     ))}
+                    <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+                      <Text style={s.ghostBtnText}>취소할게요</Text>
+                    </TouchableOpacity>
                   </>
                 )}
 
@@ -467,6 +484,9 @@ export default function HomeScreen() {
                         </TouchableOpacity>
                       </View>
                     ))}
+                    <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+                      <Text style={s.ghostBtnText}>취소할게요</Text>
+                    </TouchableOpacity>
                   </>
                 )}
 
@@ -489,6 +509,9 @@ export default function HomeScreen() {
                       }}
                     >
                       <Text style={s.mapBtnText}>🗺  카카오맵에서 더 보기</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+                      <Text style={s.ghostBtnText}>취소할게요</Text>
                     </TouchableOpacity>
                   </>
                 )}
@@ -523,13 +546,13 @@ export default function HomeScreen() {
                 {/* 안전 알림 */}
                 {screen.type === "safety_alert" && (() => {
                   const META: Record<string, { emoji: string; title: string; msg: string }> = {
-                    fall_risk:            { emoji: "🚨", title: "넘어지셨나요?",       msg: "많이 다치지 않으셨는지 걱정돼요.\n통증이 심하시면 119에 전화하세요." },
-                    medication_concern:   { emoji: "💊", title: "약을 못 드셨군요",    msg: "지금이라도 드실 수 있으면 드세요.\n많이 지나셨으면 의사 선생님께 여쭤보세요." },
-                    nutrition_concern:    { emoji: "🍚", title: "식사를 못 하셨군요",  msg: "조금이라도 드셔야 기운이 나요.\n간단한 것이라도 챙겨 드세요." },
-                    mental_health_concern:{ emoji: "💙", title: "힘드신가요?",          msg: "그런 마음이 드실 때가 있어요.\n가까운 분께 연락해 보시는 건 어떨까요?" },
-                    mobility_concern:     { emoji: "🦯", title: "거동이 불편하신가요?", msg: "무리하지 마시고 천천히 움직여 주세요.\n필요하면 도움을 요청하세요." },
-                    social_isolation:     { emoji: "🤝", title: "외로우신가요?",        msg: "혼자 있는 시간이 길면 힘드시죠.\n가족이나 이웃에게 연락해 보세요." },
-                    urgent_medical:       { emoji: "🏥", title: "몸이 많이 안 좋으신가요?", msg: "증상이 심하시면 즉시 119에 전화하세요." },
+                    fall_risk:            { emoji: "🚨", title: "넘어지셨나요?",            msg: "많이 다치지 않으셨는지 걱정돼요.\n통증이 심하시면 119에 전화하세요." },
+                    medication_concern:   { emoji: "💊", title: "약을 못 드셨군요",          msg: "지금이라도 드실 수 있으면 드세요.\n많이 지나셨으면 의사 선생님께 여쭤보세요." },
+                    nutrition_concern:    { emoji: "🍚", title: "식사를 못 하셨군요",        msg: "조금이라도 드셔야 기운이 나요.\n간단한 것이라도 챙겨 드세요." },
+                    mental_health_concern:{ emoji: "💙", title: "힘드신가요?",               msg: "그런 마음이 드실 때가 있어요.\n가까운 분께 연락해 보시는 건 어떨까요?" },
+                    mobility_concern:     { emoji: "🦯", title: "거동이 불편하신가요?",      msg: "무리하지 마시고 천천히 움직여 주세요.\n필요하면 도움을 요청하세요." },
+                    social_isolation:     { emoji: "🤝", title: "외로우신가요?",             msg: "혼자 있는 시간이 길면 힘드시죠.\n가족이나 이웃에게 연락해 보세요." },
+                    urgent_medical:       { emoji: "🏥", title: "몸이 많이 안 좋으신가요?",  msg: "증상이 심하시면 즉시 119에 전화하세요." },
                   };
                   const SEVERITY_LABEL: Record<string, string> = { high: "🔴 즉시 확인 필요", medium: "🟡 확인 권장", low: "🟢 가볍게 확인" };
                   const SEVERITY_BORDER: Record<string, string> = { high: "#C0392B", medium: "#F39C12", low: "#12B886" };
@@ -571,17 +594,6 @@ export default function HomeScreen() {
                   </View>
                 )}
 
-                {/* 결과 */}
-                {screen.type === "result" && (
-                  <View style={[s.resultCard, Shadow.card, screen.isError && s.resultCardError]}>
-                    <Text style={s.resultEmoji}>{screen.isError ? "⚠️" : "✅"}</Text>
-                    <Text style={[s.resultText, screen.isError && s.resultTextError]}>{screen.message}</Text>
-                    <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
-                      <Text style={s.ghostBtnText}>홈으로 돌아가기</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
                 {/* 관계어 피커 */}
                 {screen.type === "relationship_picker" && (
                   <>
@@ -590,7 +602,7 @@ export default function HomeScreen() {
                       <Text style={s.relationshipSub}>한 번 알려주시면 다음엔 바로 전화할게요 😊</Text>
                     </View>
                     {screen.allContacts.length === 0 ? (
-                      <Text style={s.noResultText}>연락처가 없어요.</Text>
+                      <Text style={s.emptyText}>연락처가 없어요.</Text>
                     ) : (
                       screen.allContacts.map((c) => (
                         <TouchableOpacity
@@ -610,12 +622,6 @@ export default function HomeScreen() {
                       <Text style={s.ghostBtnText}>취소할게요</Text>
                     </TouchableOpacity>
                   </>
-                )}
-
-                {(screen.type === "contact_candidates" || screen.type === "business_candidates" || screen.type === "app_candidates") && (
-                  <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
-                    <Text style={s.ghostBtnText}>취소할게요</Text>
-                  </TouchableOpacity>
                 )}
 
               </Animated.View>
@@ -642,7 +648,6 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
   },
 
-  // 헤더
   headerRow: { alignSelf: "stretch", alignItems: "flex-start" },
   appName: {
     fontSize: 13,
@@ -663,7 +668,6 @@ const s = StyleSheet.create({
   },
   micWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  // 섹션 레이블
   sectionLabel: {
     fontSize: 12,
     color: Colors.textMuted,
@@ -699,7 +703,7 @@ const s = StyleSheet.create({
   favName: { fontSize: 15, color: Colors.textPrimary, fontWeight: "600", maxWidth: 72, textAlign: "center" },
   favHint: { fontSize: 12, color: Colors.textMuted },
 
-  // 하단 버튼 행
+  // 하단 버튼
   bottomRow: { flexDirection: "row", gap: 12, width: "100%" },
   sosBtn: {
     flex: 1.3,
@@ -720,17 +724,17 @@ const s = StyleSheet.create({
   },
   textInputBtnText: { color: Colors.textSecondary, fontSize: 15, fontWeight: "500" },
 
-  // 배지
-  noResultBadge: {
+  // 권한 배지
+  permissionBadge: {
     backgroundColor: Colors.background,
     borderRadius: Radius.md,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 20,
     width: "100%",
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  noResultText: { color: Colors.textSecondary, fontSize: 14, textAlign: "center" },
+  permissionText: { color: Colors.textSecondary, fontSize: 14, textAlign: "center", lineHeight: 22 },
 
   // ── 결과 화면 ──
   resultRoot:  { flex: 1, backgroundColor: Colors.surface },
@@ -767,12 +771,6 @@ const s = StyleSheet.create({
   divider:   { height: 1, backgroundColor: Colors.border },
   answerText: { fontSize: FontSize.body, color: Colors.textPrimary, lineHeight: 32 },
 
-  resultCard:      { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.xl, alignItems: "center", gap: Spacing.md },
-  resultCardError: { backgroundColor: Colors.dangerBg },
-  resultEmoji:     { fontSize: 52 },
-  resultText:      { fontSize: FontSize.heading, fontWeight: "700", color: Colors.successText, textAlign: "center", lineHeight: 36 },
-  resultTextError: { color: Colors.danger },
-
   mapBtn:     { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 14, alignItems: "center", marginTop: Spacing.sm },
   mapBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "700" },
 
@@ -804,6 +802,7 @@ const s = StyleSheet.create({
     gap: Spacing.md,
   },
   relationshipName: { flex: 1, fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
+  emptyText: { fontSize: FontSize.body, color: Colors.textMuted, textAlign: "center" },
 
   // 공용 버튼
   primaryBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, minHeight: TouchSize.minimum, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl, width: "100%" },
