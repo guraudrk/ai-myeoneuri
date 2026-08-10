@@ -89,7 +89,20 @@ export function OnboardingScreen({ onDone }: Props) {
     }
   }
 
-  // 구글 OAuth 완료 후 session은 _layout.tsx Linking 리스너가 code 교환 → onAuthStateChange 발화
+  // _layout.tsx 대신 여기서 직접 code 교환 → 에러를 UI에 바로 표시할 수 있음
+  async function handleOAuthUrl(url: string) {
+    const parsed = Linking.parse(url);
+    const code = parsed.queryParams?.code as string | undefined;
+    if (!code) return;
+    setLoading(true);
+    const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
+    if (exchErr) {
+      setError(`구글 로그인 처리 오류: ${exchErr.message}`);
+      setLoading(false);
+    }
+    // 성공 시 onAuthStateChange(SIGNED_IN)이 아래 useEffect에서 감지
+  }
+
   async function handleGoogleLogin() {
     setError("");
     setLoading(true);
@@ -111,7 +124,18 @@ export function OnboardingScreen({ onDone }: Props) {
     }
   }
 
-  // _layout.tsx가 code를 교환하면 세션이 생기고, 여기서 감지해 select 단계로 이동
+  // 딥링크 수신 → code 교환 (앱이 이미 실행 중인 경우)
+  useEffect(() => {
+    const sub = Linking.addEventListener("url", ({ url }) => { void handleOAuthUrl(url); });
+    return () => sub.remove();
+  }, []);
+
+  // 앱이 딥링크로 cold-start된 경우 initial URL에서 code 추출
+  useEffect(() => {
+    Linking.getInitialURL().then((url) => { if (url) void handleOAuthUrl(url); });
+  }, []);
+
+  // code 교환 성공 후 세션 감지 → select 단계로 이동
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
