@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { View, StyleSheet } from "react-native";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import {
@@ -32,18 +33,21 @@ export default function RootLayout() {
     });
   }, []);
 
-  if (!onboardingChecked) return null;
-
-  if (showOnboarding) {
-    return <OnboardingScreen onDone={() => setShowOnboarding(false)} />;
-  }
-
+  // Stack은 항상 마운트 — 온보딩은 그 위에 오버레이로 표시.
+  // 이렇게 해야 onDone() 시 Stack이 즉시 드러난다.
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: Colors.background },
-      }}
-    />
+    <>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: Colors.background },
+        }}
+      />
+      {onboardingChecked && showOnboarding && (
+        <View style={StyleSheet.absoluteFillObject}>
+          <OnboardingScreen onDone={() => setShowOnboarding(false)} />
+        </View>
+      )}
+    </>
   );
 }
