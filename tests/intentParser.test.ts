@@ -157,6 +157,30 @@ describe("parseIntent() — JSON 파싱", () => {
     expect(r).toEqual({ intent: "sos" });
   });
 
+  test("date_time", async () => {
+    mockGeminiResponse({ intent: "date_time" });
+    const r = await parseIntent("오늘 날짜 알려줘");
+    expect(r).toEqual({ intent: "date_time" });
+  });
+
+  test("conversation_summary", async () => {
+    mockGeminiResponse({ intent: "conversation_summary" });
+    const r = await parseIntent("오늘 뭐 했어?");
+    expect(r).toEqual({ intent: "conversation_summary" });
+  });
+
+  test("emergency_family", async () => {
+    mockGeminiResponse({ intent: "emergency_family" });
+    const r = await parseIntent("가족 불러줘");
+    expect(r).toEqual({ intent: "emergency_family" });
+  });
+
+  test("calm_down", async () => {
+    mockGeminiResponse({ intent: "calm_down" });
+    const r = await parseIntent("무서워요");
+    expect(r).toEqual({ intent: "calm_down" });
+  });
+
   test("알 수 없는 intent → unknown", async () => {
     mockGeminiResponse({ intent: "whatever_unknown" });
     const r = await parseIntent("뭐지?");

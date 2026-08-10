@@ -40,6 +40,7 @@ import {
   removeFavorite,
   type FavoriteContact,
 } from "@/features/favorites/FavoritesAdapter";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getLinkData, clearLink, type LinkData } from "@/features/supabase/linkService";
 import { OnboardingScreen } from "@/features/onboarding/OnboardingScreen";
 import type { ContactCandidate } from "@/domain/types";
@@ -94,6 +95,7 @@ export default function HomeScreen() {
     loadFavorites();
     loadTodayLogs();
     getLinkData().then(setLinkData).catch(() => {});
+    runDailyGreeting();
     return () => { ttsStop(); };
   }, []);
 
@@ -112,6 +114,21 @@ export default function HomeScreen() {
 
   async function loadFavorites() { setFavorites(await getFavorites()); }
   async function loadTodayLogs() { setTodayLogs(await getTodayLogs()); }
+
+  // 하루 한 번 날짜·날씨 TTS — 치매 위험 어르신의 날짜 감각 지원
+  async function runDailyGreeting() {
+    try {
+      const stored = await AsyncStorage.getItem("greeting_date_v1");
+      const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+      if (stored === today) return;
+      await AsyncStorage.setItem("greeting_date_v1", today);
+      const d = new Date();
+      const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+      const greeting = `안녕하세요. 오늘은 ${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일이에요.`;
+      // 앱이 완전히 뜬 뒤 읽히도록 1.2초 딜레이
+      setTimeout(() => speak(greeting).catch(() => {}), 1200);
+    } catch { /* 무시 */ }
+  }
 
   async function handleSearch(utterance?: string) {
     const query = (utterance ?? input).trim();
@@ -177,6 +194,69 @@ export default function HomeScreen() {
       } else {
         setScreen({ type: "business_candidates", candidates: result.candidates, requestId: nextRequestId(), query: parsed.query });
       }
+      return;
+    }
+
+    if (parsed.intent === "date_time") {
+      const d = new Date();
+      const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+      const answer = `오늘은 ${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일이고, 지금 시각은 ${d.getHours()}시 ${d.getMinutes().toString().padStart(2, "0")}분이에요.`;
+      setScreen({ type: "general_answer", question: query, answer });
+      speak(answer).catch(() => {});
+      await addLog("📅", "날짜·시간 확인");
+      loadTodayLogs();
+      return;
+    }
+
+    if (parsed.intent === "conversation_summary") {
+      const logs = await getTodayLogs();
+      let answer: string;
+      if (logs.length === 0) {
+        answer = "오늘 아직 기록이 없어요.";
+      } else {
+        const items = logs.map((l) => l.summary).join(", ");
+        answer = `오늘 ${logs.length}가지를 했어요. ${items}.`;
+      }
+      setScreen({ type: "general_answer", question: query, answer });
+      speak(answer).catch(() => {});
+      return;
+    }
+
+    if (parsed.intent === "emergency_family") {
+      const favs = await getFavorites();
+      if (favs.length > 0) {
+        const first = favs[0];
+        const result = await dialContact(nextRequestId(), first.id, first.name, contactsAdapter, phoneAdapter);
+        if (result.status === "dialer_opened") {
+          await addLog("📞", `${result.contactName} 님께 긴급 연락`);
+          loadTodayLogs();
+          handleReset();
+        } else {
+          Alert.alert("연락 실패", `${first.name} 님 번호를 찾을 수 없어요.`);
+          handleReset();
+        }
+      } else {
+        setScreen({ type: "idle" });
+        Alert.alert("긴급 연락", "즐겨찾기에 가족을 추가하시면\n바로 연락드릴 수 있어요.\n\n지금은 119로 연결해 드릴까요?", [
+          { text: "취소", style: "cancel" },
+          { text: "119 전화", style: "destructive", onPress: () => Linking.openURL("tel:119") },
+        ]);
+      }
+      return;
+    }
+
+    if (parsed.intent === "calm_down") {
+      const answer = "괜찮아요. 천천히 숨을 크게 들이쉬고 내쉬어 보세요. 제가 여기 있으니까 걱정하지 않으셔도 돼요. 가족에게 연락하거나 119에 전화하려면 말씀해 주세요.";
+      setScreen({ type: "general_answer", question: query, answer });
+      speak(answer).catch(() => {});
+      await addLog("💙", "안심 안내");
+      loadTodayLogs();
+      return;
+    }
+
+    if (parsed.intent === "set_reminder") {
+      setScreen({ type: "idle" });
+      Alert.alert("", "알림 기능은 지금 지원하지 않아요.\n다른 것을 물어봐 주세요.");
       return;
     }
 
