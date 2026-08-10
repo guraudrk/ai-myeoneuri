@@ -41,8 +41,8 @@ import {
   type FavoriteContact,
 } from "@/features/favorites/FavoritesAdapter";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getLinkData, clearLink, type LinkData } from "@/features/supabase/linkService";
-import { OnboardingScreen } from "@/features/onboarding/OnboardingScreen";
+import { getLinkData, type LinkData } from "@/features/supabase/linkService";
+import { router } from "expo-router";
 import type { ContactCandidate } from "@/domain/types";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
 
@@ -86,7 +86,6 @@ export default function HomeScreen() {
   const [todayLogs, setTodayLogs]       = useState<LogEntry[]>([]);
   const [showTextInput, setShowTextInput] = useState(false);
   const [searchingMsg, setSearchingMsg]   = useState("찾고 있어요…");
-  const [showSettings, setShowSettings]   = useState(false);
   const [linkData, setLinkData]           = useState<LinkData>({ linked: false });
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -380,45 +379,6 @@ export default function HomeScreen() {
     <View style={s.root}>
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
-      {/* ─── 설정 모달: 연결됨 → bottom sheet ─── */}
-      <Modal visible={showSettings && linkData.linked} transparent animationType="slide">
-        <View style={s.modalOverlay}>
-          <View style={[s.modalCard, Shadow.card]}>
-            <Text style={s.modalTitle}>⚙️ SilverLink 연결</Text>
-            <View style={s.linkStatusBox}>
-              <Text style={s.linkStatusEmoji}>✅</Text>
-              <Text style={s.linkStatusName}>
-                {linkData.linked ? `${linkData.elderName} 어르신` : ""}
-              </Text>
-              <Text style={s.linkStatusDesc}>SilverLink와 연결되어 있어요</Text>
-            </View>
-            <TouchableOpacity
-              style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.danger }]}
-              onPress={async () => {
-                await clearLink();
-                setLinkData({ linked: false });
-                setShowSettings(false);
-              }}
-            >
-              <Text style={s.primaryBtnText}>연결 해제</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.ghostBtn} onPress={() => setShowSettings(false)}>
-              <Text style={s.ghostBtnText}>닫기</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── 설정 모달: 미연결 → 온보딩 full-screen ─── */}
-      <Modal visible={showSettings && !linkData.linked} animationType="slide">
-        <OnboardingScreen
-          onDone={() => {
-            getLinkData().then(setLinkData).catch(() => {});
-            setShowSettings(false);
-          }}
-        />
-      </Modal>
-
       {/* ─── 직접 입력 모달 ─── */}
       <Modal visible={showTextInput} transparent animationType="slide">
         <View style={s.modalOverlay}>
@@ -466,7 +426,12 @@ export default function HomeScreen() {
             {/* 즐겨찾기 */}
             {favorites.length > 0 && (
               <View style={s.favSection}>
-                <Text style={s.sectionLabel}>즐겨찾기</Text>
+                <View style={s.sectionRow}>
+                  <Text style={s.sectionLabel}>즐겨찾기</Text>
+                  <TouchableOpacity onPress={() => router.push("/favorites")}>
+                    <Text style={s.seeAll}>전체 보기 ›</Text>
+                  </TouchableOpacity>
+                </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.favScroll}>
                   {favorites.map((fav) => (
                     <TouchableOpacity
@@ -493,7 +458,12 @@ export default function HomeScreen() {
             {/* 오늘의 기록 */}
             {todayLogs.length > 0 && (
               <View style={s.logSection}>
-                <Text style={s.sectionLabel}>오늘 한 일</Text>
+                <View style={s.sectionRow}>
+                  <Text style={s.sectionLabel}>오늘 한 일</Text>
+                  <TouchableOpacity onPress={() => router.push("/history")}>
+                    <Text style={s.seeAll}>전체 보기 ›</Text>
+                  </TouchableOpacity>
+                </View>
                 {todayLogs.slice(0, 3).map((log) => (
                   <View key={log.id} style={s.logRow}>
                     <Text style={s.logEmoji}>{log.emoji}</Text>
@@ -517,12 +487,20 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* 설정 버튼 (자녀용 — 눈에 띄지 않게) */}
-            <TouchableOpacity style={s.settingsBtn} onPress={() => setShowSettings(true)}>
-              <Text style={s.settingsBtnText}>
-                {linkData.linked ? `⚙ ${linkData.elderName} 연결됨` : "⚙ SilverLink 연결"}
-              </Text>
-            </TouchableOpacity>
+            {/* 하단 네비 (자녀용 — 눈에 띄지 않게) */}
+            <View style={s.navRow}>
+              <TouchableOpacity style={s.navBtn} onPress={() => router.push("/favorites")}>
+                <Text style={s.navBtnText}>★ 즐겨찾기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.navBtn} onPress={() => router.push("/history")}>
+                <Text style={s.navBtnText}>📋 기록</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.navBtn} onPress={() => router.push("/settings")}>
+                <Text style={s.navBtnText}>
+                  {linkData.linked ? `⚙ ${linkData.elderName}` : "⚙ 설정"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </SafeAreaView>
         </View>
       )}
@@ -855,32 +833,14 @@ const s = StyleSheet.create({
   },
   textInputBtnText: { color: Colors.textSecondary, fontSize: 15, fontWeight: "500" },
 
-  // 설정 버튼 (자녀용)
-  settingsBtn: {
-    paddingVertical: 8,
-    alignItems: "center",
-  },
-  settingsBtnText: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    fontWeight: "500",
-    letterSpacing: 0.3,
-  },
+  // 섹션 헤더 행 (라벨 + 전체 보기)
+  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  seeAll:     { fontSize: 12, color: Colors.primary, fontWeight: "600" },
 
-  // 연결 상태 박스
-  linkStatusBox: {
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    backgroundColor: Colors.background,
-    borderRadius: Radius.md,
-    width: "100%",
-    marginBottom: Spacing.sm,
-  },
-  linkStatusEmoji: { fontSize: 32 },
-  linkStatusName:  { fontSize: FontSize.body, fontWeight: "700", color: Colors.textPrimary },
-  linkStatusDesc:  { fontSize: FontSize.caption, color: Colors.textMuted },
+  // 하단 네비 (자녀용)
+  navRow: { flexDirection: "row", gap: 4, paddingTop: 4 },
+  navBtn: { flex: 1, alignItems: "center", paddingVertical: 8 },
+  navBtnText: { fontSize: 11, color: Colors.textMuted, fontWeight: "500", letterSpacing: 0.3 },
 
   // 권한 배지
   permissionBadge: {

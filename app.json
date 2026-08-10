@@ -5,8 +5,14 @@
     "version": "0.1.0",
     "scheme": "aimyeoneuri",
     "orientation": "portrait",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#101828"
+    },
     "android": {
       "package": "com.leejanghan.aimyeoneuri",
+      "versionCode": 41,
       "adaptiveIcon": {
         "backgroundColor": "#12183F"
       }

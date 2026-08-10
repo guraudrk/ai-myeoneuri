@@ -1,5 +1,4 @@
-// 구글 폰트: IBM Plex Sans KR (헤딩/브랜드) + Noto Sans KR (본문)
-// 설치: expo install expo-font @expo-google-fonts/ibm-plex-sans-kr @expo-google-fonts/noto-sans-kr
+// Pretendard (assets/fonts/Pretendard-*.ttf — silverlink-web-input node_modules에서 복사)
 import { Dimensions } from "react-native";
 
 const { width } = Dimensions.get("window");
@@ -38,10 +37,10 @@ export const Colors = {
 } as const;
 
 export const FontFamily = {
-  heading:       "IBMPlexSansKR_700Bold",
-  headingMedium: "IBMPlexSansKR_600SemiBold",
-  body:          "NotoSansKR_500Medium",
-  bodyRegular:   "NotoSansKR_400Regular",
+  heading:       "Pretendard-Bold",
+  headingMedium: "Pretendard-SemiBold",
+  body:          "Pretendard-Medium",
+  bodyRegular:   "Pretendard-Regular",
 } as const;
 
 export const FontSize = {

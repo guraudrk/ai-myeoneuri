@@ -1,21 +1,13 @@
 import { useFonts } from "expo-font";
-import {
-  IBMPlexSansKR_600SemiBold,
-  IBMPlexSansKR_700Bold,
-} from "@expo-google-fonts/ibm-plex-sans-kr";
-import {
-  NotoSansKR_400Regular,
-  NotoSansKR_500Medium,
-} from "@expo-google-fonts/noto-sans-kr";
 import { Stack } from "expo-router";
 import { Colors } from "@/components/tokens";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    IBMPlexSansKR_700Bold,
-    IBMPlexSansKR_600SemiBold,
-    NotoSansKR_500Medium,
-    NotoSansKR_400Regular,
+    "Pretendard-Regular":  require("../assets/fonts/Pretendard-Regular.ttf"),
+    "Pretendard-Medium":   require("../assets/fonts/Pretendard-Medium.ttf"),
+    "Pretendard-SemiBold": require("../assets/fonts/Pretendard-SemiBold.ttf"),
+    "Pretendard-Bold":     require("../assets/fonts/Pretendard-Bold.ttf"),
   });
   void fontsLoaded;
 
