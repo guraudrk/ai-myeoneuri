@@ -93,11 +93,17 @@ export function OnboardingScreen({ onDone }: Props) {
   async function handleOAuthUrl(url: string) {
     const parsed = Linking.parse(url);
     const code = parsed.queryParams?.code as string | undefined;
+    // 코드가 없으면 (예: 일반 앱 실행 URL) 무시
     if (!code) return;
     setLoading(true);
     const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
     if (exchErr) {
-      setError(`구글 로그인 처리 오류: ${exchErr.message}`);
+      // 진단용: URL 앞부분 + 코드 길이 + 에러 메시지 표시
+      setError(
+        `[오류] ${exchErr.message}\n` +
+        `URL: ${url.slice(0, 50)}\n` +
+        `code길이: ${code.length}`
+      );
       setLoading(false);
     }
     // 성공 시 onAuthStateChange(SIGNED_IN)이 아래 useEffect에서 감지
