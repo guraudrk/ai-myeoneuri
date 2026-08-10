@@ -33,6 +33,7 @@ import type { SafetySeverity } from "@/features/intent/intentParser";
 import { speak, stop as ttsStop } from "@/features/tts/TtsService";
 import { addLog, getTodayLogs, type LogEntry } from "@/features/conversation-log/ConversationLogService";
 import { saveMapping } from "@/features/contacts/RelationshipMapper";
+import { reportSafetyConcernToSilverLink } from "@/features/safetyLink/safetyAlertBridge";
 import {
   getFavorites,
   addFavorite,
@@ -167,6 +168,7 @@ export default function HomeScreen() {
         : `괜찮으세요? 걱정이 되어서요.`;
       setScreen({ type: "safety_alert", category: parsed.category, severity: parsed.severity, utterance: parsed.utterance });
       speak(ttsText).catch(() => {});
+      reportSafetyConcernToSilverLink(parsed.category, parsed.severity, parsed.utterance).catch(() => {});
       return;
     }
 
