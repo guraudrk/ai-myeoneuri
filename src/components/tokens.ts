@@ -1,4 +1,4 @@
-// Pretendard (assets/fonts/Pretendard-*.ttf — silverlink-web-input node_modules에서 복사)
+// Spoqa Han Sans Neo — 카카오 계열이 함께 쓴 한국어 친화 폰트 (어르신 가독성 최적화)
 import { Dimensions } from "react-native";
 
 const { width } = Dimensions.get("window");
@@ -37,20 +37,21 @@ export const Colors = {
 } as const;
 
 export const FontFamily = {
-  heading:       "Pretendard-Bold",
-  headingMedium: "Pretendard-SemiBold",
-  body:          "Pretendard-Medium",
-  bodyRegular:   "Pretendard-Regular",
+  heading:       "Spoqa-Bold",
+  headingMedium: "Spoqa-Medium",
+  body:          "Spoqa-Regular",
+  bodyRegular:   "Spoqa-Light",
 } as const;
 
+// 어르신 가독성 기준 — body 24sp, caption 20sp (Google 최소 18sp 권고 상회)
 export const FontSize = {
-  body:         s(20),
-  heading:      s(24),
-  headingLarge: s(34),
-  buttonLabel:  s(20),
-  caption:      s(16),
-  label:        s(14),
-  phone:        s(28),
+  body:         s(24),
+  heading:      s(30),
+  headingLarge: s(38),
+  buttonLabel:  s(22),
+  caption:      s(20),
+  label:        s(17),
+  phone:        s(32),
 };
 
 export const LineHeight = {
@@ -63,8 +64,8 @@ export const LineHeight = {
 };
 
 export const TouchSize = {
-  minimum:    56,        // 접근성 최소값 — 고정
-  microphone: s(168),
+  minimum:    64,        // 어르신 기준 — 일반 48dp 권고 대비 +16dp
+  microphone: s(180),
 };
 
 export const Spacing = {
@@ -77,10 +78,10 @@ export const Spacing = {
 } as const;
 
 export const Radius = {
-  sm:   10,
-  md:   14,
-  lg:   20,
-  xl:   28,   // 시트 상단 모서리용
+  sm:   12,
+  md:   20,   // Toss 기준 20px+
+  lg:   28,
+  xl:   36,   // 시트 상단 모서리용
   pill: 100,
 } as const;
 
