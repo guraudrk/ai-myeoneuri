@@ -500,20 +500,18 @@ export default function HomeScreen() {
               {isListening ? "말씀해\n주세요" : "무엇을\n도와드릴까요?"}
             </Text>
 
-            {/* 추천 카드 */}
+            {/* 추천 카드 — 가로 한 줄 스트립 */}
             {rec && (
               <View style={[s.recCard, Shadow.card]}>
-                <Text style={s.recLabel}>💡 오늘의 추천</Text>
-                <Text style={s.recReason}>{rec.reason}</Text>
-                <TouchableOpacity
-                  style={[s.primaryBtn, Shadow.button]}
-                  onPress={() => handleRecDial(rec)}
-                >
-                  <Text style={s.primaryBtnText}>📞 {rec.contactName} 님께 전화</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.ghostBtn} onPress={() => handleRecSnooze(rec)}>
-                  <Text style={s.ghostBtnText}>나중에</Text>
-                </TouchableOpacity>
+                <Text style={s.recReason} numberOfLines={1}>💡 {rec.reason}</Text>
+                <View style={s.recActions}>
+                  <TouchableOpacity style={s.recDialBtn} onPress={() => handleRecDial(rec)}>
+                    <Text style={s.recDialText}>📞 {rec.contactName}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.recSnoozeBtn} onPress={() => handleRecSnooze(rec)}>
+                    <Text style={s.recSnoozeText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
@@ -840,26 +838,41 @@ const s = StyleSheet.create({
   linkedText: { fontSize: FontSize.caption, color: Colors.primary, fontWeight: "600" },
 
   heroTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: "800",
     color: Colors.textPrimary,
     textAlign: "center",
-    lineHeight: 34,
+    lineHeight: 30,
     fontFamily: FontFamily.heading,
   },
 
   // 추천 카드
   recCard: {
     width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.primaryTint,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+    borderRadius: Radius.sm,
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.md,
     gap: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.primary + "33",
   },
-  recLabel:  { fontSize: FontSize.caption, color: Colors.primary, fontWeight: "700", fontFamily: FontFamily.headingMedium },
-  recReason: { fontSize: FontSize.body,    color: Colors.textPrimary, fontFamily: FontFamily.body, lineHeight: 28 },
+  recReason: { flex: 1, fontSize: FontSize.caption, color: Colors.textPrimary, fontFamily: FontFamily.body },
+  recActions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  recDialBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recDialText:   { color: "#FFF", fontSize: FontSize.label, fontWeight: "700", fontFamily: FontFamily.headingMedium },
+  recSnoozeBtn:  { width: 32, height: 40, alignItems: "center", justifyContent: "center" },
+  recSnoozeText: { fontSize: 18, color: Colors.textMuted },
 
   micWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
 
