@@ -642,7 +642,10 @@ export default function HomeScreen() {
               )}
               {todayLogs.length > 0 && (
                 <View style={s.logSection}>
-                  <Text style={s.sectionLabel}>오늘 한 일</Text>
+                  <View style={s.logHeader}>
+                    <Text style={s.sectionLabel}>오늘 한 일</Text>
+                    <Text style={s.logHint}>자세한 기록은 '기록'탭에서</Text>
+                  </View>
                   {todayLogs.slice(0, 2).map((log) => (
                     <View key={log.id} style={s.logRow}>
                       <Text style={s.logEmoji}>{log.emoji}</Text>
@@ -1169,6 +1172,8 @@ const s = StyleSheet.create({
 
   logSection: { width: "100%", gap: 8 },
   logRow:     { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, paddingHorizontal: 4 },
+  logHeader:  { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  logHint:    { fontSize: 11, color: Colors.textMuted, fontFamily: FontFamily.body },
   logEmoji:   { fontSize: 20, width: 28 },
   logText:    { flex: 1, fontSize: FontSize.body, color: Colors.textSecondary },
   logTime:    { fontSize: FontSize.caption, color: Colors.textMuted },
