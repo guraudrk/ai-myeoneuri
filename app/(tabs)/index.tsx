@@ -13,7 +13,10 @@ import {
   BackHandler,
   StatusBar,
   Animated,
+  Dimensions,
 } from "react-native";
+
+const { height: screenHeight } = Dimensions.get("window");
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, FontFamily, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
 import type { AppCandidate } from "@/features/intent/intentParser";
@@ -106,6 +109,7 @@ export default function HomeScreen() {
   const [searchingMsg, setSearchingMsg]   = useState("찾고 있어요…");
   const [linkData, setLinkData]           = useState<LinkData>({ linked: false });
   const [rec, setRec]                     = useState<Recommendation | null>(null);
+  const [relSearch, setRelSearch] = useState("");
   const insets = useSafeAreaInsets();
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -131,6 +135,7 @@ export default function HomeScreen() {
   useEffect(() => {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+    if (screen.type !== "relationship_picker") setRelSearch("");
   }, [screen.type]);
 
   useEffect(() => {
@@ -142,11 +147,11 @@ export default function HomeScreen() {
       return;
     }
     const msgs = ["조금만 기다려 주세요…", "열심히 보고 있어요…", "거의 다 됐어요…", "잠깐만요…"];
-    let i = 0;
+    let i = -1;
     searchMsgCyclerRef.current = setInterval(() => {
       i = (i + 1) % msgs.length;
       setSearchingMsg(msgs[i]);
-    }, 2200);
+    }, 800);
     return () => {
       if (searchMsgCyclerRef.current) {
         clearInterval(searchMsgCyclerRef.current);
@@ -242,14 +247,25 @@ export default function HomeScreen() {
       if (/날씨|기온|강수|우산/.test(parsed.utterance)) {
         await addLog("🌤️", "날씨 확인");
         loadTodayLogs();
-        Linking.openURL("https://search.naver.com/search.naver?query=날씨").catch(() => {});
+        Linking.openURL("https://search.naver.com/search.naver?query=현재%20날씨").catch(() => {});
         setScreen({ type: "idle" });
         return;
       }
-      if (/환율|달러|엔화|위안|유로|원달러|외화/.test(parsed.utterance)) {
-        await addLog("💱", "환율 확인");
+      if (/환율|달러|엔화|위안|유로|원달러|외화|파운드/.test(parsed.utterance)) {
+        const currencyMap: [RegExp, string][] = [
+          [/엔화|엔|일본/,     "엔화 환율"],
+          [/위안|인민폐|중국/, "위안 환율"],
+          [/유로/,             "유로 환율"],
+          [/파운드|영국/,      "파운드 환율"],
+          [/달러|미국|원달러/, "달러 환율"],
+        ];
+        let searchQuery = "환율";
+        for (const [regex, q] of currencyMap) {
+          if (regex.test(parsed.utterance)) { searchQuery = q; break; }
+        }
+        await addLog("💱", searchQuery);
         loadTodayLogs();
-        Linking.openURL("https://search.naver.com/search.naver?query=환율").catch(() => {});
+        Linking.openURL(`https://search.naver.com/search.naver?query=${encodeURIComponent(searchQuery)}`).catch(() => {});
         setScreen({ type: "idle" });
         return;
       }
@@ -617,7 +633,7 @@ export default function HomeScreen() {
               {todayLogs.length > 0 && (
                 <View style={s.logSection}>
                   <Text style={s.sectionLabel}>오늘 한 일</Text>
-                  {todayLogs.slice(0, 3).map((log) => (
+                  {todayLogs.slice(0, 2).map((log) => (
                     <View key={log.id} style={s.logRow}>
                       <Text style={s.logEmoji}>{log.emoji}</Text>
                       <Text style={s.logText} numberOfLines={1}>{log.summary}</Text>
@@ -823,17 +839,29 @@ export default function HomeScreen() {
                 })()}
 
                 {screen.type === "general_answer" && (
-                  <View style={[s.answerCard, Shadow.card]}>
-                    <View style={s.answerQBubble}>
-                      <Text style={s.answerQIcon}>🎤</Text>
-                      <Text style={s.answerQ} numberOfLines={3}>{screen.question}</Text>
+                  <View style={s.chatContainer}>
+                    {/* 사용자 질문 말풍선 (오른쪽) */}
+                    <View style={s.userBubbleRow}>
+                      <View style={s.userBubble}>
+                        <Text style={s.userBubbleText}>{screen.question}</Text>
+                      </View>
+                      <View style={s.micBadge}>
+                        <Text style={{ fontSize: 16 }}>🎤</Text>
+                      </View>
                     </View>
-                    <View style={s.divider} />
-                    <Text style={s.answerText}>{stripMarkdown(screen.answer)}</Text>
-                    <TouchableOpacity
-                      style={s.replayBtn}
-                      onPress={() => speak(screen.answer).catch(() => {})}
-                    >
+
+                    {/* AI 답변 말풍선 (왼쪽) */}
+                    <View style={s.aiBubbleRow}>
+                      <View style={s.aiAvatar}>
+                        <Text style={{ fontSize: 18 }}>✨</Text>
+                      </View>
+                      <View style={[s.aiBubble, Shadow.card]}>
+                        <Text style={s.aiAnswerText}>{stripMarkdown(screen.answer)}</Text>
+                      </View>
+                    </View>
+
+                    {/* 액션 버튼 */}
+                    <TouchableOpacity style={s.replayBtn} onPress={() => speak(screen.answer).catch(() => {})}>
                       <Text style={s.replayBtnText}>🔊  다시 읽기</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
@@ -842,34 +870,49 @@ export default function HomeScreen() {
                   </View>
                 )}
 
-                {screen.type === "relationship_picker" && (
-                  <>
-                    <View style={s.relationshipHeader}>
-                      <Text style={s.sectionTitle}>어느 분이 '{screen.relationship}'이에요?</Text>
-                      <Text style={s.relationshipSub}>한 번 알려주시면 다음엔 바로 전화할게요 😊</Text>
-                    </View>
-                    {screen.allContacts.length === 0 ? (
-                      <Text style={s.emptyText}>연락처가 없어요.</Text>
-                    ) : (
-                      screen.allContacts.map((c) => (
-                        <TouchableOpacity
-                          key={c.id}
-                          style={[s.relationshipRow, Shadow.card]}
-                          onPress={() => handleRelationshipSelect(screen.relationship, c)}
-                        >
-                          <View style={s.favAvatar}>
-                            <Text style={s.favInitial}>{c.name.trim()[0] ?? "?"}</Text>
-                          </View>
-                          <Text style={s.relationshipName}>{c.name}</Text>
-                          <Text style={s.appChevron}>›</Text>
-                        </TouchableOpacity>
-                      ))
-                    )}
-                    <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
-                      <Text style={s.ghostBtnText}>취소할게요</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
+                {screen.type === "relationship_picker" && (() => {
+                  const filtered = relSearch.trim()
+                    ? screen.allContacts.filter((c) => c.name.includes(relSearch.trim()))
+                    : screen.allContacts;
+                  return (
+                    <>
+                      <View style={s.relationshipHeader}>
+                        <Text style={s.sectionTitle}>어느 분이 '{screen.relationship}'이에요?</Text>
+                        <Text style={s.relationshipSub}>한 번 알려주시면 다음엔 바로 전화할게요 😊</Text>
+                      </View>
+                      <TextInput
+                        style={s.relSearchInput}
+                        value={relSearch}
+                        onChangeText={setRelSearch}
+                        placeholder="이름으로 검색…"
+                        placeholderTextColor={Colors.placeholder}
+                        returnKeyType="search"
+                      />
+                      {filtered.length === 0 ? (
+                        <Text style={s.emptyText}>
+                          {relSearch.trim() ? `"${relSearch}" 연락처가 없어요.` : "연락처가 없어요."}
+                        </Text>
+                      ) : (
+                        filtered.map((c) => (
+                          <TouchableOpacity
+                            key={c.id}
+                            style={[s.relationshipRow, Shadow.card]}
+                            onPress={() => handleRelationshipSelect(screen.relationship, c)}
+                          >
+                            <View style={s.favAvatar}>
+                              <Text style={s.favInitial}>{c.name.trim()[0] ?? "?"}</Text>
+                            </View>
+                            <Text style={s.relationshipName}>{c.name}</Text>
+                            <Text style={s.appChevron}>›</Text>
+                          </TouchableOpacity>
+                        ))
+                      )}
+                      <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+                        <Text style={s.ghostBtnText}>취소할게요</Text>
+                      </TouchableOpacity>
+                    </>
+                  );
+                })()}
 
               </Animated.View>
             </ScrollView>
@@ -895,6 +938,7 @@ const s = StyleSheet.create({
   bottomGroup: {
     gap: 10,
     paddingBottom: Spacing.md,
+    maxHeight: Math.round(screenHeight * 0.36),
   },
 
   // 헤더: 날짜 표시
@@ -1052,12 +1096,36 @@ const s = StyleSheet.create({
   safetyTitle:  { fontSize: FontSize.headingLarge, fontWeight: "800", color: Colors.dangerDeep, textAlign: "center", fontFamily: FontFamily.heading },
   safetyMsg:    { fontSize: FontSize.body, color: Colors.textSecondary, textAlign: "center", lineHeight: 30 },
 
-  answerCard:    { backgroundColor: Colors.primaryTint, borderRadius: Radius.lg, padding: Spacing.xl, gap: Spacing.md },
-  answerQBubble: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  answerQIcon:   { fontSize: 20 },
-  answerQ:       { flex: 1, fontSize: FontSize.caption, color: Colors.textMuted, fontStyle: "italic", lineHeight: 24 },
-  divider:       { height: 1, backgroundColor: Colors.border },
-  answerText:    { fontSize: FontSize.body, color: Colors.textPrimary, lineHeight: 32 },
+  // 채팅 버블 스타일 (Gemini 스타일)
+  chatContainer: { gap: Spacing.md },
+
+  userBubbleRow: { flexDirection: "row", justifyContent: "flex-end", alignItems: "flex-end", gap: 8 },
+  userBubble: {
+    backgroundColor: Colors.primary,
+    borderRadius: 20,
+    borderBottomRightRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    maxWidth: "76%",
+  },
+  userBubbleText: { color: "#FFF", fontSize: FontSize.body, lineHeight: 26, fontFamily: "Pretendard-Regular" },
+  micBadge: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primaryTint, alignItems: "center", justifyContent: "center", flexShrink: 0, borderWidth: 1, borderColor: Colors.primary + "33" },
+
+  aiBubbleRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  aiAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  aiBubble: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    borderTopLeftRadius: 4,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  aiAnswerText: { fontSize: 17, color: Colors.textPrimary, lineHeight: 32, fontFamily: "Pretendard-Regular" },
+
+  divider: { height: 1, backgroundColor: Colors.border },
 
   mapBtn:     { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 16, alignItems: "center", marginTop: Spacing.sm, minHeight: TouchSize.minimum, justifyContent: "center" },
   mapBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "700" },
@@ -1074,6 +1142,18 @@ const s = StyleSheet.create({
   replayBtn:     { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 14, alignItems: "center", width: "100%", minHeight: TouchSize.minimum, justifyContent: "center" },
   replayBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "600" },
 
+  relSearchInput: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    fontSize: FontSize.body,
+    color: Colors.textPrimary,
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 8,
+  },
   relationshipHeader: { gap: 6, marginBottom: 4 },
   relationshipSub:    { fontSize: FontSize.caption, color: Colors.textMuted },
   relationshipRow: {

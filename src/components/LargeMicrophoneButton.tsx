@@ -177,7 +177,7 @@ export function LargeMicrophoneButton({
 
   const btnColor =
     state === "error"      ? Colors.danger :
-    state === "listening"  ? "#1D3DBF" :     // 진해진 primary (누른 느낌)
+    state === "listening"  ? Colors.danger :
     Colors.primary;
 
   const ringColor = state === "listening" ? Colors.primary : Colors.danger;
