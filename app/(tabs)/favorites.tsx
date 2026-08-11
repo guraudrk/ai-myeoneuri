@@ -57,10 +57,19 @@ export default function FavoritesScreen() {
   }
 
   async function handleAdd(c: ContactCandidate) {
-    await addFavorite({ id: c.id, name: c.name });
-    await load();
-    setShowAdd(false);
-    setQuery("");
+    Alert.alert(
+      "가족 추가",
+      `${c.name} 님을 즐겨찾기에 추가할까요?`,
+      [
+        { text: "취소", style: "cancel" },
+        { text: "추가할게요", onPress: async () => {
+          await addFavorite({ id: c.id, name: c.name });
+          await load();
+          setShowAdd(false);
+          setQuery("");
+        }},
+      ]
+    );
   }
 
   const initial = (n: string) => n.trim()[0] ?? "?";
@@ -192,7 +201,7 @@ const s = StyleSheet.create({
   avatarText: { fontSize: FontSize.body, color: "#FFF", fontWeight: "700" },
   name:       { flex: 1, fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary, fontFamily: FontFamily.body },
 
-  callBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 16, minHeight: 44, justifyContent: "center" },
+  callBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 16, minHeight: 44, justifyContent: "center", alignItems: "center", flexShrink: 0 },
   callBtnText: { color: "#FFF", fontSize: FontSize.caption, fontWeight: "700" },
 
   delBtn:     { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.background, alignItems: "center", justifyContent: "center" },

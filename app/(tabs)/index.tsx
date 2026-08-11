@@ -13,7 +13,6 @@ import {
   BackHandler,
   StatusBar,
   Animated,
-  SafeAreaView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, FontFamily, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
@@ -90,7 +89,7 @@ type ScreenState =
   | { type: "confirming_contact"; candidate: ContactCandidate; requestId: string }
   | { type: "countdown_contact"; candidate: ContactCandidate; requestId: string }
   | { type: "confirming_business"; business: BusinessCandidate; requestId: string }
-  | { type: "general_answer"; question: string; answer: string; meta?: "date_time" }
+  | { type: "general_answer"; question: string; answer: string }
   | { type: "safety_alert"; category: string; severity: SafetySeverity; utterance: string }
   | { type: "app_candidates"; candidates: AppCandidate[]; appFamily: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
@@ -107,10 +106,10 @@ export default function HomeScreen() {
   const [searchingMsg, setSearchingMsg]   = useState("찾고 있어요…");
   const [linkData, setLinkData]           = useState<LinkData>({ linked: false });
   const [rec, setRec]                     = useState<Recommendation | null>(null);
-  const [relSearch, setRelSearch]          = useState("");
   const insets = useSafeAreaInsets();
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const searchMsgCyclerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     loadFavorites();
@@ -132,7 +131,28 @@ export default function HomeScreen() {
   useEffect(() => {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 240, useNativeDriver: true }).start();
-    if (screen.type !== "relationship_picker") setRelSearch("");
+  }, [screen.type]);
+
+  useEffect(() => {
+    if (screen.type !== "searching") {
+      if (searchMsgCyclerRef.current) {
+        clearInterval(searchMsgCyclerRef.current);
+        searchMsgCyclerRef.current = null;
+      }
+      return;
+    }
+    const msgs = ["조금만 기다려 주세요…", "열심히 보고 있어요…", "거의 다 됐어요…", "잠깐만요…"];
+    let i = 0;
+    searchMsgCyclerRef.current = setInterval(() => {
+      i = (i + 1) % msgs.length;
+      setSearchingMsg(msgs[i]);
+    }, 2200);
+    return () => {
+      if (searchMsgCyclerRef.current) {
+        clearInterval(searchMsgCyclerRef.current);
+        searchMsgCyclerRef.current = null;
+      }
+    };
   }, [screen.type]);
 
   async function loadFavorites() { setFavorites(await getFavorites()); }
@@ -219,6 +239,20 @@ export default function HomeScreen() {
     }
 
     if (parsed.intent === "general_question") {
+      if (/날씨|기온|강수|우산/.test(parsed.utterance)) {
+        await addLog("🌤️", "날씨 확인");
+        loadTodayLogs();
+        Linking.openURL("https://search.naver.com/search.naver?query=날씨").catch(() => {});
+        setScreen({ type: "idle" });
+        return;
+      }
+      if (/환율|달러|엔화|위안|유로|원달러|외화/.test(parsed.utterance)) {
+        await addLog("💱", "환율 확인");
+        loadTodayLogs();
+        Linking.openURL("https://search.naver.com/search.naver?query=환율").catch(() => {});
+        setScreen({ type: "idle" });
+        return;
+      }
       setSearchingMsg("정리하고 있어요…");
       const answer = await askGemini(parsed.utterance, {
         onRetry: () => setSearchingMsg("조금만 기다려 주세요…"),
@@ -250,7 +284,7 @@ export default function HomeScreen() {
       const d = new Date();
       const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
       const answer = `오늘은 ${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일이고, 지금 시각은 ${d.getHours()}시 ${d.getMinutes().toString().padStart(2, "0")}분이에요.`;
-      setScreen({ type: "general_answer", question: query, answer, meta: "date_time" });
+      setScreen({ type: "general_answer", question: query, answer });
       speak(answer).catch(() => {});
       await addLog("📅", "날짜·시간 확인");
       loadTodayLogs();
@@ -426,23 +460,8 @@ export default function HomeScreen() {
   }
 
   async function handleRelationshipSelect(relationship: string, candidate: ContactCandidate) {
-    Alert.alert(
-      "확인해 주세요",
-      `정말 ${candidate.name} 님이 '${relationship}' 맞으신가요?`,
-      [
-        { text: "아니에요", style: "cancel" },
-        { text: "맞아요!", onPress: async () => {
-          await saveMapping(relationship, candidate.id);
-          // 즐겨찾기에도 자동 추가 (없는 경우)
-          const existing = await getFavorites();
-          if (!existing.find((f) => f.id === candidate.id)) {
-            await addFavorite({ id: candidate.id, name: candidate.name });
-            setFavorites(await getFavorites());
-          }
-          setScreen({ type: "confirming_contact", candidate, requestId: nextRequestId() });
-        }},
-      ]
-    );
+    await saveMapping(relationship, candidate.id);
+    setScreen({ type: "confirming_contact", candidate, requestId: nextRequestId() });
   }
 
   // ─── 추천 핸들러 ─────────────────────────────────────────────────────────────
@@ -531,7 +550,7 @@ export default function HomeScreen() {
       {/* ══════ IDLE 화면 ══════ */}
       {screen.type === "idle" && (
         <View style={s.idleRoot}>
-          <SafeAreaView style={s.idleInner}>
+          <View style={s.idleInner}>
 
             {/* ── 상단 그룹: 헤더 · 인사말 · 추천 카드 ── */}
             <View style={[s.topGroup, { paddingTop: insets.top + 8 }]}>
@@ -589,6 +608,7 @@ export default function HomeScreen() {
                           <Text style={s.favInitial}>{initial(fav.name)}</Text>
                         </View>
                         <Text style={s.favName} numberOfLines={1}>{fav.name}</Text>
+                        <Text style={s.favCallLabel}>📞 전화</Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
@@ -619,14 +639,14 @@ export default function HomeScreen() {
               </View>
             </View>
 
-          </SafeAreaView>
+          </View>
         </View>
       )}
 
       {/* ══════ 권한 없음 ══════ */}
       {screen.type === "permission_denied" && (
         <View style={s.idleRoot}>
-          <SafeAreaView style={s.idleInner}>
+          <View style={s.idleInner}>
             <View style={[s.topGroup, { paddingTop: insets.top + 8 }]}>
               <View style={s.headerRow}><Text style={s.dateLabel}>{todayLabel()}</Text></View>
               <Text style={s.heroTitle}>무엇을{"\n"}도와드릴까요?</Text>
@@ -649,7 +669,7 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </SafeAreaView>
+          </View>
         </View>
       )}
 
@@ -672,7 +692,7 @@ export default function HomeScreen() {
         screen.type === "app_candidates" ||
         screen.type === "relationship_picker") && (
         <View style={s.resultRoot}>
-          <SafeAreaView style={{ flex: 1 }}>
+          <View style={{ flex: 1 }}>
             <ScrollView contentContainerStyle={[s.resultInner, { paddingTop: insets.top + 16 }]}>
               <Animated.View style={{ opacity: fadeAnim, gap: Spacing.md }}>
 
@@ -802,36 +822,7 @@ export default function HomeScreen() {
                   );
                 })()}
 
-                {screen.type === "general_answer" && screen.meta === "date_time" && (() => {
-                  const d = new Date();
-                  const DAYS_FULL = ["일요일","월요일","화요일","수요일","목요일","금요일","토요일"];
-                  const h = d.getHours();
-                  const timeOfDay = h < 6 ? "새벽" : h < 12 ? "오전" : h < 18 ? "오후" : "저녁";
-                  const timeEmoji = h < 6 ? "🌙" : h < 12 ? "🌅" : h < 18 ? "☀️" : "🌆";
-                  return (
-                    <View style={[s.dateTimeCard, Shadow.card]}>
-                      <Text style={s.dateTimeEmoji}>{timeEmoji}</Text>
-                      <Text style={s.dateTimeDayName}>{DAYS_FULL[d.getDay()]}</Text>
-                      <Text style={s.dateTimeBigDate}>
-                        {d.getMonth() + 1}월 {d.getDate()}일
-                      </Text>
-                      <Text style={s.dateTimeYear}>{d.getFullYear()}년</Text>
-                      <View style={s.dateTimeDivider} />
-                      <Text style={s.dateTimeLabel}>{timeOfDay} {d.getHours() % 12 || 12}시</Text>
-                      <Text style={s.dateTimeClock}>
-                        {d.getHours().toString().padStart(2, "0")}:{d.getMinutes().toString().padStart(2, "0")}
-                      </Text>
-                      <TouchableOpacity style={s.replayBtn} onPress={() => speak(screen.answer).catch(() => {})}>
-                        <Text style={s.replayBtnText}>🔊  다시 읽기</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
-                        <Text style={s.ghostBtnText}>홈으로 돌아가기</Text>
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })()}
-
-                {screen.type === "general_answer" && !screen.meta && (
+                {screen.type === "general_answer" && (
                   <View style={[s.answerCard, Shadow.card]}>
                     <View style={s.answerQBubble}>
                       <Text style={s.answerQIcon}>🎤</Text>
@@ -851,53 +842,38 @@ export default function HomeScreen() {
                   </View>
                 )}
 
-                {screen.type === "relationship_picker" && (() => {
-                  const filtered = relSearch
-                    ? screen.allContacts.filter((c) => c.name.includes(relSearch))
-                    : screen.allContacts;
-                  return (
-                    <>
-                      <View style={s.relationshipHeader}>
-                        <Text style={s.sectionTitle}>어느 분이 '{screen.relationship}'이에요?</Text>
-                        <Text style={s.relationshipSub}>한 번 알려주시면 다음엔 바로 전화할게요 😊</Text>
-                      </View>
-                      <TextInput
-                        style={s.relSearchInput}
-                        value={relSearch}
-                        onChangeText={setRelSearch}
-                        placeholder="이름으로 검색…"
-                        placeholderTextColor={Colors.placeholder}
-                        returnKeyType="search"
-                      />
-                      {filtered.length === 0 ? (
-                        <Text style={s.emptyText}>
-                          {relSearch ? `"${relSearch}" 연락처가 없어요.` : "연락처가 없어요."}
-                        </Text>
-                      ) : (
-                        filtered.map((c) => (
-                          <TouchableOpacity
-                            key={c.id}
-                            style={[s.relationshipRow, Shadow.card]}
-                            onPress={() => handleRelationshipSelect(screen.relationship, c)}
-                          >
-                            <View style={s.favAvatar}>
-                              <Text style={s.favInitial}>{c.name.trim()[0] ?? "?"}</Text>
-                            </View>
-                            <Text style={s.relationshipName}>{c.name}</Text>
-                            <Text style={s.appChevron}>›</Text>
-                          </TouchableOpacity>
-                        ))
-                      )}
-                      <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
-                        <Text style={s.ghostBtnText}>취소할게요</Text>
-                      </TouchableOpacity>
-                    </>
-                  );
-                })()}
+                {screen.type === "relationship_picker" && (
+                  <>
+                    <View style={s.relationshipHeader}>
+                      <Text style={s.sectionTitle}>어느 분이 '{screen.relationship}'이에요?</Text>
+                      <Text style={s.relationshipSub}>한 번 알려주시면 다음엔 바로 전화할게요 😊</Text>
+                    </View>
+                    {screen.allContacts.length === 0 ? (
+                      <Text style={s.emptyText}>연락처가 없어요.</Text>
+                    ) : (
+                      screen.allContacts.map((c) => (
+                        <TouchableOpacity
+                          key={c.id}
+                          style={[s.relationshipRow, Shadow.card]}
+                          onPress={() => handleRelationshipSelect(screen.relationship, c)}
+                        >
+                          <View style={s.favAvatar}>
+                            <Text style={s.favInitial}>{c.name.trim()[0] ?? "?"}</Text>
+                          </View>
+                          <Text style={s.relationshipName}>{c.name}</Text>
+                          <Text style={s.appChevron}>›</Text>
+                        </TouchableOpacity>
+                      ))
+                    )}
+                    <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+                      <Text style={s.ghostBtnText}>취소할게요</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
 
               </Animated.View>
             </ScrollView>
-          </SafeAreaView>
+          </View>
         </View>
       )}
     </View>
@@ -1007,7 +983,8 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   favInitial: { fontSize: FontSize.body, color: "#FFF", fontWeight: "700" },
-  favName:    { fontSize: FontSize.caption, color: Colors.textPrimary, fontWeight: "600", maxWidth: 72, textAlign: "center" },
+  favName:      { fontSize: FontSize.caption, color: Colors.textPrimary, fontWeight: "600", maxWidth: 72, textAlign: "center" },
+  favCallLabel: { fontSize: 11, color: Colors.primary, fontWeight: "600" },
 
   bottomRow: { flexDirection: "row", gap: 12, width: "100%" },
   sosBtn: {
@@ -1081,29 +1058,6 @@ const s = StyleSheet.create({
   answerQ:       { flex: 1, fontSize: FontSize.caption, color: Colors.textMuted, fontStyle: "italic", lineHeight: 24 },
   divider:       { height: 1, backgroundColor: Colors.border },
   answerText:    { fontSize: FontSize.body, color: Colors.textPrimary, lineHeight: 32 },
-
-  // 날짜·시간 카드
-  dateTimeCard:    { backgroundColor: Colors.primaryTint, borderRadius: Radius.lg, padding: Spacing.xl, alignItems: "center", gap: Spacing.sm, borderWidth: 1, borderColor: Colors.primary + "22" },
-  dateTimeEmoji:   { fontSize: 52 },
-  dateTimeDayName: { fontSize: FontSize.body, fontWeight: "600", color: Colors.textMuted, fontFamily: FontFamily.headingMedium },
-  dateTimeBigDate: { fontSize: 42, fontWeight: "800", color: Colors.textPrimary, lineHeight: 52, fontFamily: FontFamily.heading },
-  dateTimeYear:    { fontSize: FontSize.body, color: Colors.textMuted },
-  dateTimeDivider: { width: "60%", height: 1, backgroundColor: Colors.border, marginVertical: 4 },
-  dateTimeLabel:   { fontSize: FontSize.caption, color: Colors.textMuted, letterSpacing: 1 },
-  dateTimeClock:   { fontSize: 36, fontWeight: "700", color: Colors.primary, fontFamily: FontFamily.heading, letterSpacing: 2 },
-
-  // 관계 검색창
-  relSearchInput: {
-    backgroundColor: Colors.background,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    fontSize: FontSize.body,
-    color: Colors.textPrimary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    minHeight: TouchSize.minimum,
-  },
 
   mapBtn:     { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 16, alignItems: "center", marginTop: Spacing.sm, minHeight: TouchSize.minimum, justifyContent: "center" },
   mapBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "700" },
