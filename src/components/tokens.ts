@@ -33,6 +33,9 @@ export const Colors = {
   success:          "#065F46",
   successBg:        "#ECFDF5",
   successText:      "#032D22",
+  // warning #92400E → luminance 0.075 → 7.6:1 on white ✓ AAA
+  warning:          "#92400E",
+  warningBg:        "#FFFBEB",
 } as const;
 
 // ─── 다크 팔레트 (dark mode 대응용 — useColorScheme()과 함께 사용) ─────────
@@ -59,6 +62,8 @@ export const DarkColors: Record<keyof typeof Colors, string> = {
   success:          "#32D583",
   successBg:        "#0D2318",
   successText:      "#ABEFC6",
+  warning:          "#FCD34D",
+  warningBg:        "#292000",
 } as const;
 
 export const FontFamily = {

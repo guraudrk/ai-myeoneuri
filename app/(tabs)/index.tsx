@@ -20,6 +20,7 @@ import type { AppCandidate } from "@/features/intent/intentParser";
 import { LargeMicrophoneButton, type MicState } from "@/components/LargeMicrophoneButton";
 import { ContactCandidateCard } from "@/components/ContactCandidateCard";
 import { ConfirmationPanel } from "@/components/ConfirmationPanel";
+import { CallCountdownDialog } from "@/components/CallCountdownDialog";
 import { BusinessCandidateCard } from "@/components/BusinessCandidateCard";
 import { searchContacts, dialContact } from "@/services/contactCallService";
 import { searchBusinesses, dialBusiness } from "@/services/businessCallService";
@@ -86,6 +87,7 @@ type ScreenState =
   | { type: "contact_candidates"; candidates: ContactCandidate[]; requestId: string }
   | { type: "business_candidates"; candidates: BusinessCandidate[]; requestId: string; query: string }
   | { type: "confirming_contact"; candidate: ContactCandidate; requestId: string }
+  | { type: "countdown_contact"; candidate: ContactCandidate; requestId: string }
   | { type: "confirming_business"; business: BusinessCandidate; requestId: string }
   | { type: "general_answer"; question: string; answer: string }
   | { type: "safety_alert"; category: string; severity: SafetySeverity; utterance: string }
@@ -468,6 +470,17 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* ─── 전화 카운트다운 다이얼로그 ─── */}
+      <CallCountdownDialog
+        visible={screen.type === "countdown_contact"}
+        contactName={screen.type === "countdown_contact" ? screen.candidate.name : ""}
+        onConfirm={() => {
+          if (screen.type === "countdown_contact")
+            handleConfirmContact(screen.candidate, screen.requestId);
+        }}
+        onCancel={handleReset}
+      />
+
       {/* ══════ IDLE 화면 ══════ */}
       {screen.type === "idle" && (
         <View style={s.idleRoot}>
@@ -605,6 +618,7 @@ export default function HomeScreen() {
       {(screen.type === "contact_candidates" ||
         screen.type === "business_candidates" ||
         screen.type === "confirming_contact" ||
+        screen.type === "countdown_contact" ||
         screen.type === "confirming_business" ||
         screen.type === "general_answer" ||
         screen.type === "safety_alert" ||
@@ -684,10 +698,10 @@ export default function HomeScreen() {
                   </>
                 )}
 
-                {screen.type === "confirming_contact" && (
+                {(screen.type === "confirming_contact" || screen.type === "countdown_contact") && (
                   <ConfirmationPanel
                     candidate={screen.candidate}
-                    onConfirm={() => handleConfirmContact(screen.candidate, screen.requestId)}
+                    onConfirm={() => setScreen({ type: "countdown_contact", candidate: screen.candidate, requestId: screen.requestId })}
                     onCancel={handleReset}
                   />
                 )}
@@ -720,7 +734,7 @@ export default function HomeScreen() {
                     urgent_medical:       { emoji: "🏥", title: "몸이 많이 안 좋으신가요?",  msg: "증상이 심하시면 즉시 119에 전화하세요." },
                   };
                   const SEVERITY_LABEL: Record<string, string> = { high: "🔴 즉시 확인 필요", medium: "🟡 확인 권장", low: "🟢 가볍게 확인" };
-                  const SEVERITY_BORDER: Record<string, string> = { high: Colors.danger, medium: "#F39C12", low: Colors.success };
+                  const SEVERITY_BORDER: Record<string, string> = { high: Colors.danger, medium: Colors.warning, low: Colors.success };
                   const m = META[screen.category] ?? META.urgent_medical;
                   const border = SEVERITY_BORDER[screen.severity] ?? Colors.danger;
                   return (
