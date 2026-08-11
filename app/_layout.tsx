@@ -9,7 +9,7 @@ export default function RootLayout() {
     "Pretendard-Medium":   require("../assets/fonts/Pretendard-Medium.ttf"),
     "Pretendard-Regular":  require("../assets/fonts/Pretendard-Regular.ttf"),
   });
-  void fontsLoaded;
+  if (!fontsLoaded) return null;
 
   return (
     <Stack

@@ -15,6 +15,7 @@ import {
   Animated,
   SafeAreaView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, FontFamily, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
 import type { AppCandidate } from "@/features/intent/intentParser";
 import { LargeMicrophoneButton, type MicState } from "@/components/LargeMicrophoneButton";
@@ -89,7 +90,7 @@ type ScreenState =
   | { type: "confirming_contact"; candidate: ContactCandidate; requestId: string }
   | { type: "countdown_contact"; candidate: ContactCandidate; requestId: string }
   | { type: "confirming_business"; business: BusinessCandidate; requestId: string }
-  | { type: "general_answer"; question: string; answer: string }
+  | { type: "general_answer"; question: string; answer: string; meta?: "date_time" }
   | { type: "safety_alert"; category: string; severity: SafetySeverity; utterance: string }
   | { type: "app_candidates"; candidates: AppCandidate[]; appFamily: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
@@ -106,6 +107,8 @@ export default function HomeScreen() {
   const [searchingMsg, setSearchingMsg]   = useState("찾고 있어요…");
   const [linkData, setLinkData]           = useState<LinkData>({ linked: false });
   const [rec, setRec]                     = useState<Recommendation | null>(null);
+  const [relSearch, setRelSearch]          = useState("");
+  const insets = useSafeAreaInsets();
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -129,6 +132,7 @@ export default function HomeScreen() {
   useEffect(() => {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+    if (screen.type !== "relationship_picker") setRelSearch("");
   }, [screen.type]);
 
   async function loadFavorites() { setFavorites(await getFavorites()); }
@@ -161,12 +165,31 @@ export default function HomeScreen() {
     setShowTextInput(false);
     setInput("");
     setMicError(false);
-    setSearchingMsg("찾아보고 있어요…");
+
+    // 키워드로 초기 메시지를 미리 추정
+    const initialMsg =
+      /전화|연락|통화/.test(query) ? "연락처 찾는 중…" :
+      /날씨|기온|비|눈|맑/.test(query) ? "날씨 확인 중…" :
+      /어디|근처|가까운|찾아/.test(query) ? "주변 검색 중…" :
+      /날짜|요일|몇 시|시간|오늘/.test(query) ? "시간 확인 중…" :
+      "찾아보고 있어요…";
+    setSearchingMsg(initialMsg);
     setScreen({ type: "searching" });
 
     const parsed = await parseIntent(query, {
       onRetry: () => setSearchingMsg("조금만 기다려 주세요…"),
     });
+
+    // 인텐트 확정 후 메시지 업데이트
+    const intentMsg: Partial<Record<string, string>> = {
+      call_contact:    "연락처 찾는 중…",
+      search_business: "주변 검색 중…",
+      general_question:"답변 정리 중…",
+      date_time:       "날짜 확인 중…",
+      safety_concern:  "상황 확인 중…",
+      open_app:        "앱 찾는 중…",
+    };
+    if (intentMsg[parsed.intent]) setSearchingMsg(intentMsg[parsed.intent]!);
 
     if (parsed.intent === "sos") { setScreen({ type: "idle" }); handleSOS(); return; }
 
@@ -227,7 +250,7 @@ export default function HomeScreen() {
       const d = new Date();
       const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
       const answer = `오늘은 ${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일이고, 지금 시각은 ${d.getHours()}시 ${d.getMinutes().toString().padStart(2, "0")}분이에요.`;
-      setScreen({ type: "general_answer", question: query, answer });
+      setScreen({ type: "general_answer", question: query, answer, meta: "date_time" });
       speak(answer).catch(() => {});
       await addLog("📅", "날짜·시간 확인");
       loadTodayLogs();
@@ -373,9 +396,18 @@ export default function HomeScreen() {
   }
 
   async function handleAddFavorite(candidate: ContactCandidate) {
-    await addFavorite({ id: candidate.id, name: candidate.name });
-    setFavorites(await getFavorites());
-    Alert.alert("즐겨찾기 추가", `${candidate.name} 님을 즐겨찾기에 추가했어요.`);
+    Alert.alert(
+      "가족 추가",
+      `${candidate.name} 님을 즐겨찾기(가족)에 추가할까요?`,
+      [
+        { text: "취소", style: "cancel" },
+        { text: "추가할게요", onPress: async () => {
+          await addFavorite({ id: candidate.id, name: candidate.name });
+          setFavorites(await getFavorites());
+          Alert.alert("완료", `${candidate.name} 님을 가족으로 추가했어요 😊`);
+        }},
+      ]
+    );
   }
 
   async function handleFavoriteDial(fav: FavoriteContact) {
@@ -394,8 +426,23 @@ export default function HomeScreen() {
   }
 
   async function handleRelationshipSelect(relationship: string, candidate: ContactCandidate) {
-    await saveMapping(relationship, candidate.id);
-    setScreen({ type: "confirming_contact", candidate, requestId: nextRequestId() });
+    Alert.alert(
+      "확인해 주세요",
+      `정말 ${candidate.name} 님이 '${relationship}' 맞으신가요?`,
+      [
+        { text: "아니에요", style: "cancel" },
+        { text: "맞아요!", onPress: async () => {
+          await saveMapping(relationship, candidate.id);
+          // 즐겨찾기에도 자동 추가 (없는 경우)
+          const existing = await getFavorites();
+          if (!existing.find((f) => f.id === candidate.id)) {
+            await addFavorite({ id: candidate.id, name: candidate.name });
+            setFavorites(await getFavorites());
+          }
+          setScreen({ type: "confirming_contact", candidate, requestId: nextRequestId() });
+        }},
+      ]
+    );
   }
 
   // ─── 추천 핸들러 ─────────────────────────────────────────────────────────────
@@ -485,95 +532,93 @@ export default function HomeScreen() {
       {screen.type === "idle" && (
         <View style={s.idleRoot}>
           <SafeAreaView style={s.idleInner}>
-            {/* 헤더: 오늘 날짜 */}
-            <View style={s.headerRow}>
-              <Text style={s.dateLabel}>{todayLabel()}</Text>
-              {linkData.linked && (
-                <View style={s.linkedBadge}>
-                  <Text style={s.linkedText}>🔗 {linkData.elderName}</Text>
+
+            {/* ── 상단 그룹: 헤더 · 인사말 · 추천 카드 ── */}
+            <View style={[s.topGroup, { paddingTop: insets.top + 8 }]}>
+              <View style={s.headerRow}>
+                <Text style={s.dateLabel}>{todayLabel()}</Text>
+                {linkData.linked && (
+                  <View style={s.linkedBadge}>
+                    <Text style={s.linkedText}>🔗 {linkData.elderName}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={s.heroTitle}>
+                {isListening ? "말씀해\n주세요" : "무엇을\n도와드릴까요?"}
+              </Text>
+              {rec && (
+                <View style={[s.recCard, Shadow.card]}>
+                  <Text style={s.recReason} numberOfLines={1}>💡 {rec.reason}</Text>
+                  <View style={s.recActions}>
+                    <TouchableOpacity style={s.recDialBtn} onPress={() => handleRecDial(rec)}>
+                      <Text style={s.recDialText}>📞 {rec.contactName}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.recSnoozeBtn} onPress={() => handleRecSnooze(rec)}>
+                      <Text style={s.recSnoozeText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
 
-            {/* 인사말 */}
-            <Text style={s.heroTitle}>
-              {isListening ? "말씀해\n주세요" : "무엇을\n도와드릴까요?"}
-            </Text>
-
-            {/* 추천 카드 — 가로 한 줄 스트립 */}
-            {rec && (
-              <View style={[s.recCard, Shadow.card]}>
-                <Text style={s.recReason} numberOfLines={1}>💡 {rec.reason}</Text>
-                <View style={s.recActions}>
-                  <TouchableOpacity style={s.recDialBtn} onPress={() => handleRecDial(rec)}>
-                    <Text style={s.recDialText}>📞 {rec.contactName}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.recSnoozeBtn} onPress={() => handleRecSnooze(rec)}>
-                    <Text style={s.recSnoozeText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {/* 마이크 버튼 (화면 하단 1/3 영역) */}
+            {/* ── 중간: 마이크 (남은 공간 전부 차지, 정중앙) ── */}
             <View style={s.micWrap}>
               <LargeMicrophoneButton micState={micState} onPress={handleMicPress} />
             </View>
 
-            {/* 즐겨찾기 */}
-            {favorites.length > 0 && (
-              <View style={s.favSection}>
-                <View style={s.sectionRow}>
-                  <Text style={s.sectionLabel}>즐겨찾기</Text>
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.favScroll}>
-                  {favorites.map((fav) => (
-                    <TouchableOpacity
-                      key={fav.id}
-                      style={s.favCard}
-                      onPress={() => handleFavoriteDial(fav)}
-                      onLongPress={() => Alert.alert("즐겨찾기 삭제", `${fav.name} 님을 삭제할까요?`, [
-                        { text: "취소", style: "cancel" },
-                        { text: "삭제", style: "destructive", onPress: () => handleRemoveFavorite(fav.id) },
-                      ])}
-                      accessibilityLabel={`${fav.name} 전화`}
-                    >
-                      <View style={s.favAvatar}>
-                        <Text style={s.favInitial}>{initial(fav.name)}</Text>
-                      </View>
-                      <Text style={s.favName} numberOfLines={1}>{fav.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {/* 오늘의 기록 */}
-            {todayLogs.length > 0 && (
-              <View style={s.logSection}>
-                <Text style={s.sectionLabel}>오늘 한 일</Text>
-                {todayLogs.slice(0, 3).map((log) => (
-                  <View key={log.id} style={s.logRow}>
-                    <Text style={s.logEmoji}>{log.emoji}</Text>
-                    <Text style={s.logText} numberOfLines={1}>{log.summary}</Text>
-                    <Text style={s.logTime}>{(() => {
-                      const d = new Date(log.timestamp);
-                      return `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
-                    })()}</Text>
+            {/* ── 하단 그룹: 즐겨찾기 · 기록 · 버튼 ── */}
+            <View style={s.bottomGroup}>
+              {favorites.length > 0 && (
+                <View style={s.favSection}>
+                  <View style={s.sectionRow}>
+                    <Text style={s.sectionLabel}>즐겨찾기</Text>
                   </View>
-                ))}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.favScroll}>
+                    {favorites.map((fav) => (
+                      <TouchableOpacity
+                        key={fav.id}
+                        style={s.favCard}
+                        onPress={() => handleFavoriteDial(fav)}
+                        onLongPress={() => Alert.alert("즐겨찾기 삭제", `${fav.name} 님을 삭제할까요?`, [
+                          { text: "취소", style: "cancel" },
+                          { text: "삭제", style: "destructive", onPress: () => handleRemoveFavorite(fav.id) },
+                        ])}
+                        accessibilityLabel={`${fav.name} 전화`}
+                      >
+                        <View style={s.favAvatar}>
+                          <Text style={s.favInitial}>{initial(fav.name)}</Text>
+                        </View>
+                        <Text style={s.favName} numberOfLines={1}>{fav.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+              {todayLogs.length > 0 && (
+                <View style={s.logSection}>
+                  <Text style={s.sectionLabel}>오늘 한 일</Text>
+                  {todayLogs.slice(0, 3).map((log) => (
+                    <View key={log.id} style={s.logRow}>
+                      <Text style={s.logEmoji}>{log.emoji}</Text>
+                      <Text style={s.logText} numberOfLines={1}>{log.summary}</Text>
+                      <Text style={s.logTime}>{(() => {
+                        const d = new Date(log.timestamp);
+                        return `${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
+                      })()}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              <View style={s.bottomRow}>
+                <TouchableOpacity style={s.sosBtn} onPress={handleSOS} accessibilityLabel="긴급 SOS">
+                  <Text style={s.sosBtnText}>🆘  SOS</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.textInputBtn} onPress={() => setShowTextInput(true)}>
+                  <Text style={s.textInputBtnText}>⌨️ 직접 입력</Text>
+                </TouchableOpacity>
               </View>
-            )}
-
-            {/* 하단 버튼 */}
-            <View style={s.bottomRow}>
-              <TouchableOpacity style={s.sosBtn} onPress={handleSOS} accessibilityLabel="긴급 SOS">
-                <Text style={s.sosBtnText}>🆘  SOS</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.textInputBtn} onPress={() => setShowTextInput(true)}>
-                <Text style={s.textInputBtnText}>⌨️ 직접 입력</Text>
-              </TouchableOpacity>
             </View>
+
           </SafeAreaView>
         </View>
       )}
@@ -582,23 +627,27 @@ export default function HomeScreen() {
       {screen.type === "permission_denied" && (
         <View style={s.idleRoot}>
           <SafeAreaView style={s.idleInner}>
-            <View style={s.headerRow}><Text style={s.dateLabel}>{todayLabel()}</Text></View>
-            <Text style={s.heroTitle}>무엇을{"\n"}도와드릴까요?</Text>
+            <View style={[s.topGroup, { paddingTop: insets.top + 8 }]}>
+              <View style={s.headerRow}><Text style={s.dateLabel}>{todayLabel()}</Text></View>
+              <Text style={s.heroTitle}>무엇을{"\n"}도와드릴까요?</Text>
+            </View>
             <View style={s.micWrap}>
               <LargeMicrophoneButton micState="idle" onPress={handleMicPress} />
             </View>
-            <View style={s.permissionBadge}>
-              <Text style={s.permissionText}>
-                {screen.reason === "contacts" ? "🔒 연락처 권한이 없어요.\n설정에서 허용해 주세요." : "🔒 위치 권한이 없어요.\n설정에서 허용해 주세요."}
-              </Text>
-            </View>
-            <View style={s.bottomRow}>
-              <TouchableOpacity style={s.sosBtn} onPress={handleSOS}>
-                <Text style={s.sosBtnText}>🆘  SOS</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.textInputBtn} onPress={() => setShowTextInput(true)}>
-                <Text style={s.textInputBtnText}>⌨️ 직접 입력</Text>
-              </TouchableOpacity>
+            <View style={s.bottomGroup}>
+              <View style={s.permissionBadge}>
+                <Text style={s.permissionText}>
+                  {screen.reason === "contacts" ? "🔒 연락처 권한이 없어요.\n설정에서 허용해 주세요." : "🔒 위치 권한이 없어요.\n설정에서 허용해 주세요."}
+                </Text>
+              </View>
+              <View style={s.bottomRow}>
+                <TouchableOpacity style={s.sosBtn} onPress={handleSOS}>
+                  <Text style={s.sosBtnText}>🆘  SOS</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.textInputBtn} onPress={() => setShowTextInput(true)}>
+                  <Text style={s.textInputBtnText}>⌨️ 직접 입력</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </SafeAreaView>
         </View>
@@ -624,7 +673,7 @@ export default function HomeScreen() {
         screen.type === "relationship_picker") && (
         <View style={s.resultRoot}>
           <SafeAreaView style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={s.resultInner}>
+            <ScrollView contentContainerStyle={[s.resultInner, { paddingTop: insets.top + 16 }]}>
               <Animated.View style={{ opacity: fadeAnim, gap: Spacing.md }}>
 
                 {screen.type === "app_candidates" && (
@@ -753,9 +802,41 @@ export default function HomeScreen() {
                   );
                 })()}
 
-                {screen.type === "general_answer" && (
+                {screen.type === "general_answer" && screen.meta === "date_time" && (() => {
+                  const d = new Date();
+                  const DAYS_FULL = ["일요일","월요일","화요일","수요일","목요일","금요일","토요일"];
+                  const h = d.getHours();
+                  const timeOfDay = h < 6 ? "새벽" : h < 12 ? "오전" : h < 18 ? "오후" : "저녁";
+                  const timeEmoji = h < 6 ? "🌙" : h < 12 ? "🌅" : h < 18 ? "☀️" : "🌆";
+                  return (
+                    <View style={[s.dateTimeCard, Shadow.card]}>
+                      <Text style={s.dateTimeEmoji}>{timeEmoji}</Text>
+                      <Text style={s.dateTimeDayName}>{DAYS_FULL[d.getDay()]}</Text>
+                      <Text style={s.dateTimeBigDate}>
+                        {d.getMonth() + 1}월 {d.getDate()}일
+                      </Text>
+                      <Text style={s.dateTimeYear}>{d.getFullYear()}년</Text>
+                      <View style={s.dateTimeDivider} />
+                      <Text style={s.dateTimeLabel}>{timeOfDay} {d.getHours() % 12 || 12}시</Text>
+                      <Text style={s.dateTimeClock}>
+                        {d.getHours().toString().padStart(2, "0")}:{d.getMinutes().toString().padStart(2, "0")}
+                      </Text>
+                      <TouchableOpacity style={s.replayBtn} onPress={() => speak(screen.answer).catch(() => {})}>
+                        <Text style={s.replayBtnText}>🔊  다시 읽기</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+                        <Text style={s.ghostBtnText}>홈으로 돌아가기</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })()}
+
+                {screen.type === "general_answer" && !screen.meta && (
                   <View style={[s.answerCard, Shadow.card]}>
-                    <Text style={s.answerQ}>🎤  "{screen.question}"</Text>
+                    <View style={s.answerQBubble}>
+                      <Text style={s.answerQIcon}>🎤</Text>
+                      <Text style={s.answerQ} numberOfLines={3}>{screen.question}</Text>
+                    </View>
                     <View style={s.divider} />
                     <Text style={s.answerText}>{stripMarkdown(screen.answer)}</Text>
                     <TouchableOpacity
@@ -770,34 +851,49 @@ export default function HomeScreen() {
                   </View>
                 )}
 
-                {screen.type === "relationship_picker" && (
-                  <>
-                    <View style={s.relationshipHeader}>
-                      <Text style={s.sectionTitle}>어느 분이 '{screen.relationship}'이에요?</Text>
-                      <Text style={s.relationshipSub}>한 번 알려주시면 다음엔 바로 전화할게요 😊</Text>
-                    </View>
-                    {screen.allContacts.length === 0 ? (
-                      <Text style={s.emptyText}>연락처가 없어요.</Text>
-                    ) : (
-                      screen.allContacts.map((c) => (
-                        <TouchableOpacity
-                          key={c.id}
-                          style={[s.relationshipRow, Shadow.card]}
-                          onPress={() => handleRelationshipSelect(screen.relationship, c)}
-                        >
-                          <View style={s.favAvatar}>
-                            <Text style={s.favInitial}>{c.name.trim()[0] ?? "?"}</Text>
-                          </View>
-                          <Text style={s.relationshipName}>{c.name}</Text>
-                          <Text style={s.appChevron}>›</Text>
-                        </TouchableOpacity>
-                      ))
-                    )}
-                    <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
-                      <Text style={s.ghostBtnText}>취소할게요</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
+                {screen.type === "relationship_picker" && (() => {
+                  const filtered = relSearch
+                    ? screen.allContacts.filter((c) => c.name.includes(relSearch))
+                    : screen.allContacts;
+                  return (
+                    <>
+                      <View style={s.relationshipHeader}>
+                        <Text style={s.sectionTitle}>어느 분이 '{screen.relationship}'이에요?</Text>
+                        <Text style={s.relationshipSub}>한 번 알려주시면 다음엔 바로 전화할게요 😊</Text>
+                      </View>
+                      <TextInput
+                        style={s.relSearchInput}
+                        value={relSearch}
+                        onChangeText={setRelSearch}
+                        placeholder="이름으로 검색…"
+                        placeholderTextColor={Colors.placeholder}
+                        returnKeyType="search"
+                      />
+                      {filtered.length === 0 ? (
+                        <Text style={s.emptyText}>
+                          {relSearch ? `"${relSearch}" 연락처가 없어요.` : "연락처가 없어요."}
+                        </Text>
+                      ) : (
+                        filtered.map((c) => (
+                          <TouchableOpacity
+                            key={c.id}
+                            style={[s.relationshipRow, Shadow.card]}
+                            onPress={() => handleRelationshipSelect(screen.relationship, c)}
+                          >
+                            <View style={s.favAvatar}>
+                              <Text style={s.favInitial}>{c.name.trim()[0] ?? "?"}</Text>
+                            </View>
+                            <Text style={s.relationshipName}>{c.name}</Text>
+                            <Text style={s.appChevron}>›</Text>
+                          </TouchableOpacity>
+                        ))
+                      )}
+                      <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+                        <Text style={s.ghostBtnText}>취소할게요</Text>
+                      </TouchableOpacity>
+                    </>
+                  );
+                })()}
 
               </Animated.View>
             </ScrollView>
@@ -815,10 +911,14 @@ const s = StyleSheet.create({
   idleInner: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
-    paddingTop: (StatusBar.currentHeight ?? 28) + 16,
-    paddingBottom: Spacing.xl,
-    alignItems: "center",
+  },
+  topGroup: {
     gap: Spacing.sm,
+    alignItems: "center",
+  },
+  bottomGroup: {
+    gap: 10,
+    paddingBottom: Spacing.md,
   },
 
   // 헤더: 날짜 표시
@@ -947,7 +1047,7 @@ const s = StyleSheet.create({
   permissionText: { color: Colors.textSecondary, fontSize: FontSize.body, textAlign: "center", lineHeight: 30 },
 
   resultRoot:  { flex: 1, backgroundColor: Colors.surface },
-  resultInner: { padding: Spacing.lg, gap: Spacing.md, paddingTop: (StatusBar.currentHeight ?? 28) + 16 },
+  resultInner: { padding: Spacing.lg, gap: Spacing.md },
 
   centerFull:    { flex: 1, justifyContent: "center", alignItems: "center", gap: Spacing.lg, backgroundColor: Colors.surface },
   searchingText: { fontSize: FontSize.body, color: Colors.textSecondary },
@@ -975,10 +1075,35 @@ const s = StyleSheet.create({
   safetyTitle:  { fontSize: FontSize.headingLarge, fontWeight: "800", color: Colors.dangerDeep, textAlign: "center", fontFamily: FontFamily.heading },
   safetyMsg:    { fontSize: FontSize.body, color: Colors.textSecondary, textAlign: "center", lineHeight: 30 },
 
-  answerCard: { backgroundColor: Colors.primaryTint, borderRadius: Radius.lg, padding: Spacing.xl, gap: Spacing.md },
-  answerQ:    { fontSize: FontSize.caption, color: Colors.textMuted, fontStyle: "italic", lineHeight: 24 },
-  divider:    { height: 1, backgroundColor: Colors.border },
-  answerText: { fontSize: FontSize.body, color: Colors.textPrimary, lineHeight: 32 },
+  answerCard:    { backgroundColor: Colors.primaryTint, borderRadius: Radius.lg, padding: Spacing.xl, gap: Spacing.md },
+  answerQBubble: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  answerQIcon:   { fontSize: 20 },
+  answerQ:       { flex: 1, fontSize: FontSize.caption, color: Colors.textMuted, fontStyle: "italic", lineHeight: 24 },
+  divider:       { height: 1, backgroundColor: Colors.border },
+  answerText:    { fontSize: FontSize.body, color: Colors.textPrimary, lineHeight: 32 },
+
+  // 날짜·시간 카드
+  dateTimeCard:    { backgroundColor: Colors.primaryTint, borderRadius: Radius.lg, padding: Spacing.xl, alignItems: "center", gap: Spacing.sm, borderWidth: 1, borderColor: Colors.primary + "22" },
+  dateTimeEmoji:   { fontSize: 52 },
+  dateTimeDayName: { fontSize: FontSize.body, fontWeight: "600", color: Colors.textMuted, fontFamily: FontFamily.headingMedium },
+  dateTimeBigDate: { fontSize: 42, fontWeight: "800", color: Colors.textPrimary, lineHeight: 52, fontFamily: FontFamily.heading },
+  dateTimeYear:    { fontSize: FontSize.body, color: Colors.textMuted },
+  dateTimeDivider: { width: "60%", height: 1, backgroundColor: Colors.border, marginVertical: 4 },
+  dateTimeLabel:   { fontSize: FontSize.caption, color: Colors.textMuted, letterSpacing: 1 },
+  dateTimeClock:   { fontSize: 36, fontWeight: "700", color: Colors.primary, fontFamily: FontFamily.heading, letterSpacing: 2 },
+
+  // 관계 검색창
+  relSearchInput: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    fontSize: FontSize.body,
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minHeight: TouchSize.minimum,
+  },
 
   mapBtn:     { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 16, alignItems: "center", marginTop: Spacing.sm, minHeight: TouchSize.minimum, justifyContent: "center" },
   mapBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "700" },
