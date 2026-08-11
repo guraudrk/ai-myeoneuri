@@ -201,8 +201,8 @@ const s = StyleSheet.create({
   avatarText: { fontSize: FontSize.body, color: "#FFF", fontWeight: "700" },
   name:       { flex: 1, fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary, fontFamily: FontFamily.body },
 
-  callBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 16, minHeight: 44, width: 72, justifyContent: "center", alignItems: "center", flexShrink: 0 },
-  callBtnText: { color: "#FFF", fontSize: FontSize.caption, fontWeight: "700" },
+  callBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 8, paddingHorizontal: 10, minHeight: 40, width: 64, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  callBtnText: { color: "#FFF", fontSize: 12, fontWeight: "700" },
 
   delBtn:     { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.background, alignItems: "center", justifyContent: "center" },
   delBtnText: { fontSize: 22, color: Colors.textMuted },

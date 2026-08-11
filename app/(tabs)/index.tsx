@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -46,6 +46,7 @@ import {
 } from "@/features/favorites/FavoritesAdapter";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getLinkData, type LinkData } from "@/features/supabase/linkService";
+import { useFocusEffect } from "expo-router";
 import type { ContactCandidate } from "@/domain/types";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
 import {
@@ -110,6 +111,8 @@ export default function HomeScreen() {
   const [linkData, setLinkData]           = useState<LinkData>({ linked: false });
   const [rec, setRec]                     = useState<Recommendation | null>(null);
   const [relSearch, setRelSearch] = useState("");
+  const [contactPickerSearch, setContactPickerSearch] = useState("");
+  const [contactPickerAll, setContactPickerAll] = useState<ContactCandidate[]>([]);
   const insets = useSafeAreaInsets();
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -124,6 +127,9 @@ export default function HomeScreen() {
     return () => { ttsStop(); };
   }, []);
 
+  // 탭 전환 후 돌아올 때 즐겨찾기 갱신
+  useFocusEffect(useCallback(() => { loadFavorites(); }, []));
+
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (screen.type !== "idle") { handleReset(); return true; }
@@ -136,6 +142,7 @@ export default function HomeScreen() {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 240, useNativeDriver: true }).start();
     if (screen.type !== "relationship_picker") setRelSearch("");
+    if (screen.type !== "contact_candidates") { setContactPickerSearch(""); }
   }, [screen.type]);
 
   useEffect(() => {
@@ -370,6 +377,8 @@ export default function HomeScreen() {
         setScreen({ type: "idle" });
         Alert.alert("", "찾을 수 없었어요.\n다시 말씀해 주세요.");
       } else {
+        const allC = await contactsAdapter.searchContacts("");
+        setContactPickerAll(allC);
         setScreen({ type: "contact_candidates", candidates: result.candidates, requestId: nextRequestId() });
       }
       return;
@@ -385,6 +394,8 @@ export default function HomeScreen() {
       setScreen({ type: "idle" });
       Alert.alert("", "찾을 수 없었어요.\n다시 말씀해 주세요.");
     } else {
+      const allC = await contactsAdapter.searchContacts("");
+      setContactPickerAll(allC);
       setScreen({ type: "contact_candidates", candidates: result.candidates, requestId: nextRequestId() });
     }
   }
@@ -565,8 +576,7 @@ export default function HomeScreen() {
 
       {/* ══════ IDLE 화면 ══════ */}
       {screen.type === "idle" && (
-        <View style={s.idleRoot}>
-          <View style={s.idleInner}>
+        <ScrollView style={s.idleRoot} contentContainerStyle={s.idleScrollContent} showsVerticalScrollIndicator={false}>
 
             {/* ── 상단 그룹: 헤더 · 인사말 · 추천 카드 ── */}
             <View style={[s.topGroup, { paddingTop: insets.top + 8 }]}>
@@ -655,8 +665,7 @@ export default function HomeScreen() {
               </View>
             </View>
 
-          </View>
-        </View>
+        </ScrollView>
       )}
 
       {/* ══════ 권한 없음 ══════ */}
@@ -736,25 +745,53 @@ export default function HomeScreen() {
                   </>
                 )}
 
-                {screen.type === "contact_candidates" && (
-                  <>
-                    <Text style={s.sectionTitle}>누구에게 전화할까요?</Text>
-                    {screen.candidates.map((c) => (
-                      <View key={c.id} style={s.candidateRow}>
-                        <ContactCandidateCard
-                          candidate={c}
+                {screen.type === "contact_candidates" && (() => {
+                  const filtered = contactPickerSearch.trim()
+                    ? contactPickerAll.filter((c) => c.name.includes(contactPickerSearch.trim()))
+                    : contactPickerAll;
+                  return (
+                    <>
+                      <Text style={s.sectionTitle}>누구에게 전화할까요?</Text>
+                      {screen.candidates.map((c) => (
+                        <View key={c.id} style={s.candidateRow}>
+                          <ContactCandidateCard
+                            candidate={c}
+                            onPress={() => setScreen({ type: "confirming_contact", candidate: c, requestId: screen.requestId })}
+                          />
+                          <TouchableOpacity style={s.starBtn} onPress={() => handleAddFavorite(c)} accessibilityLabel="즐겨찾기 추가">
+                            <Text style={s.starText}>☆</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      <View style={s.divider} />
+                      <Text style={s.phonebookLabel}>전화번호부에서 찾기</Text>
+                      <TextInput
+                        style={s.relSearchInput}
+                        value={contactPickerSearch}
+                        onChangeText={setContactPickerSearch}
+                        placeholder="이름으로 검색…"
+                        placeholderTextColor={Colors.placeholder}
+                        returnKeyType="search"
+                      />
+                      {filtered.map((c) => (
+                        <TouchableOpacity
+                          key={c.id}
+                          style={[s.relationshipRow, Shadow.card]}
                           onPress={() => setScreen({ type: "confirming_contact", candidate: c, requestId: screen.requestId })}
-                        />
-                        <TouchableOpacity style={s.starBtn} onPress={() => handleAddFavorite(c)} accessibilityLabel="즐겨찾기 추가">
-                          <Text style={s.starText}>☆</Text>
+                        >
+                          <View style={s.favAvatar}>
+                            <Text style={s.favInitial}>{c.name.trim()[0] ?? "?"}</Text>
+                          </View>
+                          <Text style={s.relationshipName}>{c.name}</Text>
+                          <Text style={s.appChevron}>›</Text>
                         </TouchableOpacity>
-                      </View>
-                    ))}
-                    <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
-                      <Text style={s.ghostBtnText}>취소할게요</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
+                      ))}
+                      <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+                        <Text style={s.ghostBtnText}>취소할게요</Text>
+                      </TouchableOpacity>
+                    </>
+                  );
+                })()}
 
                 {screen.type === "business_candidates" && (
                   <>
@@ -927,8 +964,9 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.surface },
 
   idleRoot:  { flex: 1, backgroundColor: Colors.surface },
-  idleInner: {
-    flex: 1,
+  idleInner: { flex: 1, paddingHorizontal: Spacing.lg },
+  idleScrollContent: {
+    minHeight: screenHeight,
     paddingHorizontal: Spacing.lg,
   },
   topGroup: {
@@ -938,7 +976,6 @@ const s = StyleSheet.create({
   bottomGroup: {
     gap: 10,
     paddingBottom: Spacing.md,
-    maxHeight: Math.round(screenHeight * 0.36),
   },
 
   // 헤더: 날짜 표시
@@ -994,7 +1031,7 @@ const s = StyleSheet.create({
   recSnoozeBtn:  { width: 32, height: 40, alignItems: "center", justifyContent: "center" },
   recSnoozeText: { fontSize: 18, color: Colors.textMuted },
 
-  micWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
+  micWrap: { height: Math.round(screenHeight * 0.40), justifyContent: "center", alignItems: "center" },
 
   sectionLabel: {
     fontSize: FontSize.caption,
@@ -1142,6 +1179,7 @@ const s = StyleSheet.create({
   replayBtn:     { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 14, alignItems: "center", width: "100%", minHeight: TouchSize.minimum, justifyContent: "center" },
   replayBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "600" },
 
+  phonebookLabel: { fontSize: FontSize.caption, color: Colors.textMuted, fontWeight: "600", marginTop: 4 },
   relSearchInput: {
     backgroundColor: Colors.background,
     borderRadius: Radius.md,
