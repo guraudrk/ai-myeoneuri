@@ -817,10 +817,10 @@ const s = StyleSheet.create({
   idleInner: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
-    paddingTop: (StatusBar.currentHeight ?? 28) + 20,
+    paddingTop: (StatusBar.currentHeight ?? 28) + 16,
     paddingBottom: Spacing.xl,
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: Spacing.sm,
   },
 
   // 헤더: 날짜 표시
@@ -840,11 +840,11 @@ const s = StyleSheet.create({
   linkedText: { fontSize: FontSize.caption, color: Colors.primary, fontWeight: "600" },
 
   heroTitle: {
-    fontSize: 40,
+    fontSize: 26,
     fontWeight: "800",
     color: Colors.textPrimary,
     textAlign: "center",
-    lineHeight: 56,
+    lineHeight: 34,
     fontFamily: FontFamily.heading,
   },
 
@@ -852,14 +852,14 @@ const s = StyleSheet.create({
   recCard: {
     width: "100%",
     backgroundColor: Colors.primaryTint,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    gap: Spacing.md,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.primary + "33",
   },
   recLabel:  { fontSize: FontSize.caption, color: Colors.primary, fontWeight: "700", fontFamily: FontFamily.headingMedium },
-  recReason: { fontSize: FontSize.body,    color: Colors.textPrimary, fontFamily: FontFamily.body, lineHeight: 34 },
+  recReason: { fontSize: FontSize.body,    color: Colors.textPrimary, fontFamily: FontFamily.body, lineHeight: 28 },
 
   micWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
 
