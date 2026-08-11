@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx",
     "test": "jest --passWithNoTests",
+    "check-contrast": "node scripts/check-contrast.js",
     "test:watch": "jest --watch",
     "build": "expo export",
     "doctor": "npx expo-doctor",

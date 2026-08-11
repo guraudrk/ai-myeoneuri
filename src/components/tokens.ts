@@ -1,72 +1,97 @@
-// Spoqa Han Sans Neo — 카카오 계열이 함께 쓴 한국어 친화 폰트 (어르신 가독성 최적화)
 import { Dimensions } from "react-native";
 
 const { width } = Dimensions.get("window");
-const BASE_WIDTH = 390;                                          // Galaxy S24 기준
+const BASE_WIDTH = 390;
 // 갤A15(360dp) → ×0.92, 갤S24(393dp) → ×1.0, 대화면 상한 ×1.1
 const s = (n: number) =>
   Math.round(n * Math.min(Math.max(width / BASE_WIDTH, 0.85), 1.1));
 
-// SilverLink 디자인 시스템과 동일한 팔레트 (--sl-* 변수 기준)
+// ─── 라이트 팔레트 (WCAG AAA #1939B7 = 8.97:1 on white) ───────────────────
 export const Colors = {
-  background:       "#F5F7FB",   // --sl-bg
+  background:       "#F5F7FB",
   surface:          "#FFFFFF",
-  surfaceSecondary: "#EEF2FF",   // --sl-primary-tint
-  border:           "#E7EBF3",   // --sl-border
+  surfaceSecondary: "#EEF2FF",
+  border:           "#E7EBF3",
 
-  textPrimary:      "#101828",   // --sl-ink
-  textSecondary:    "#344054",   // --sl-body-strong
-  textMuted:        "#667085",   // --sl-muted
-  placeholder:      "#98A2B3",   // --sl-placeholder
+  textPrimary:      "#101828",   // 17.5:1 on white ✓ AAA
+  textSecondary:    "#344054",   // 10.2:1 on white ✓ AAA
+  textMuted:        "#667085",   //  5.9:1 on white — caption only (20sp+)
+  placeholder:      "#98A2B3",
 
-  primary:          "#2E5BFF",   // --sl-primary
-  primaryDeep:      "#234AE0",   // --sl-primary-hover
-  primaryTint:      "#EEF2FF",   // --sl-primary-tint
-  accentWarm:       "#FFC531",   // 마이크 링·포인트 강조 (SilverLink 외)
+  // primary #1939B7 → luminance 0.067 → contrast 8.97:1 on white ✓ WCAG AAA
+  primary:          "#1939B7",
+  primaryDeep:      "#122D92",
+  primaryTint:      "#EEF2FF",
+  accentWarm:       "#FFC531",
 
-  navyDeep:         "#25409E",   // 사용 보류 (이전 홈 배경색)
-  navyMid:          "#3E5FC9",
-
-  danger:           "#F04438",   // --sl-danger
-  dangerDeep:       "#C7291F",
+  // danger #991B1B → luminance 0.078 → 8.2:1 on white ✓ AAA
+  danger:           "#991B1B",
+  dangerDeep:       "#7F1D1D",
   dangerTint:       "#FEF3F2",
   dangerBg:         "#FEF3F2",
-  success:          "#12B76A",   // --sl-success
+  // success #065F46 → luminance 0.094 → 7.3:1 on white ✓ AAA
+  success:          "#065F46",
   successBg:        "#ECFDF5",
-  successText:      "#065F46",
+  successText:      "#032D22",
+} as const;
+
+// ─── 다크 팔레트 (dark mode 대응용 — useColorScheme()과 함께 사용) ─────────
+export const DarkColors: Record<keyof typeof Colors, string> = {
+  background:       "#0F1117",
+  surface:          "#1A1D27",
+  surfaceSecondary: "#1E2238",
+  border:           "#2D3148",
+
+  textPrimary:      "#F2F4F7",
+  textSecondary:    "#D0D5DD",
+  textMuted:        "#98A2B3",
+  placeholder:      "#667085",
+
+  primary:          "#7B94FF",   // lighter for dark bg — 4.7:1 on #1A1D27 ✓ AA+
+  primaryDeep:      "#A3B4FF",
+  primaryTint:      "#1E2238",
+  accentWarm:       "#FFC531",
+
+  danger:           "#F97066",
+  dangerDeep:       "#FDA29B",
+  dangerTint:       "#2D1515",
+  dangerBg:         "#2D1515",
+  success:          "#32D583",
+  successBg:        "#0D2318",
+  successText:      "#ABEFC6",
 } as const;
 
 export const FontFamily = {
-  heading:       "Spoqa-Bold",
-  headingMedium: "Spoqa-Medium",
-  body:          "Spoqa-Regular",
-  bodyRegular:   "Spoqa-Light",
+  heading:       "Pretendard-Bold",
+  headingMedium: "Pretendard-SemiBold",
+  body:          "Pretendard-Regular",
+  bodyMedium:    "Pretendard-Medium",
 } as const;
 
-// 어르신 가독성 기준 — body 24sp, caption 20sp (Google 최소 18sp 권고 상회)
+// 어르신 가독성 기준 — body 20sp 이상, caption 18sp 이상 (WCAG AAA 2.5.8)
 export const FontSize = {
-  body:         s(24),
-  heading:      s(30),
-  headingLarge: s(38),
-  buttonLabel:  s(22),
-  caption:      s(20),
-  label:        s(17),
-  phone:        s(32),
-};
+  body:         s(22),
+  heading:      s(28),
+  headingLarge: s(34),
+  buttonLabel:  s(20),
+  caption:      s(18),
+  label:        s(16),
+  phone:        s(30),
+} as const;
 
 export const LineHeight = {
-  body:         s(28),
-  heading:      s(32),
-  headingLarge: s(44),
-  buttonLabel:  s(26),
-  caption:      s(22),
-  phone:        s(34),
-};
+  body:         s(32),
+  heading:      s(36),
+  headingLarge: s(42),
+  buttonLabel:  s(28),
+  caption:      s(26),
+  phone:        s(38),
+} as const;
 
 export const TouchSize = {
-  minimum:    64,        // 어르신 기준 — 일반 48dp 권고 대비 +16dp
-  microphone: s(180),
-};
+  minimum:    64,
+  microphone: Math.round(width * 0.5),  // 화면 너비 50%
+} as const;
 
 export const Spacing = {
   xs: 4,
@@ -79,9 +104,9 @@ export const Spacing = {
 
 export const Radius = {
   sm:   12,
-  md:   20,   // Toss 기준 20px+
+  md:   20,
   lg:   28,
-  xl:   36,   // 시트 상단 모서리용
+  xl:   36,
   pill: 100,
 } as const;
 
@@ -89,22 +114,22 @@ export const Shadow = {
   card: {
     shadowColor: "#101828",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
   },
   button: {
-    shadowColor: "#2E5BFF",
+    shadowColor: "#1939B7",
     shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.30,
+    shadowOpacity: 0.28,
     shadowRadius: 12,
     elevation: 6,
   },
   mic: {
-    shadowColor: "#2E5BFF",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.40,
-    shadowRadius: 24,
-    elevation: 14,
+    shadowColor: "#1939B7",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.38,
+    shadowRadius: 28,
+    elevation: 16,
   },
 } as const;

@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import {
-  View, Text, SectionList, TouchableOpacity, StyleSheet, StatusBar,
+  View, Text, SectionList, StyleSheet, StatusBar,
 } from "react-native";
-import { router } from "expo-router";
 import { getLogs, type LogEntry } from "@/features/conversation-log/ConversationLogService";
 import { Colors, FontFamily, FontSize, Spacing, Radius } from "@/components/tokens";
 
@@ -47,11 +46,7 @@ export default function HistoryScreen() {
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       <View style={s.header}>
-        <TouchableOpacity style={s.headerSide} onPress={() => router.back()}>
-          <Text style={s.backText}>‹ 뒤로</Text>
-        </TouchableOpacity>
         <Text style={s.headerTitle}>대화 기록</Text>
-        <View style={s.headerSide} />
       </View>
 
       <SectionList
@@ -88,8 +83,6 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
 
   header: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: Spacing.lg,
     paddingTop: (StatusBar.currentHeight ?? 24) + 12,
     paddingBottom: 14,
@@ -97,16 +90,12 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  headerSide:  { minWidth: 64 },
   headerTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
     color: Colors.textPrimary,
     fontFamily: FontFamily.heading,
   },
-  backText: { fontSize: 16, color: Colors.primary, fontWeight: "600", fontFamily: FontFamily.body },
 
   list:      { padding: Spacing.lg, paddingBottom: 48 },
   listEmpty: { flex: 1 },
@@ -119,7 +108,7 @@ const s = StyleSheet.create({
     marginBottom: 10,
   },
   dayLabel: {
-    fontSize: 11,
+    fontSize: FontSize.caption,
     fontWeight: "700",
     color: Colors.textMuted,
     letterSpacing: 1.5,
@@ -139,11 +128,11 @@ const s = StyleSheet.create({
     gap: 10,
   },
   logEmoji:   { fontSize: 22, width: 30 },
-  logSummary: { flex: 1, fontSize: FontSize.caption, color: Colors.textPrimary, lineHeight: 22, fontFamily: FontFamily.body },
-  logTime:    { fontSize: 12, color: Colors.textMuted, fontFamily: FontFamily.bodyRegular },
+  logSummary: { flex: 1, fontSize: FontSize.caption, color: Colors.textPrimary, lineHeight: 26, fontFamily: FontFamily.body },
+  logTime:    { fontSize: FontSize.caption, color: Colors.textMuted, fontFamily: FontFamily.body },
 
   empty:      { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, paddingTop: 80 },
   emptyEmoji: { fontSize: 56 },
   emptyTitle: { fontSize: FontSize.heading, fontWeight: "700", color: Colors.textPrimary, fontFamily: FontFamily.heading },
-  emptySub:   { fontSize: FontSize.caption, color: Colors.textMuted, textAlign: "center", lineHeight: 24, fontFamily: FontFamily.bodyRegular },
+  emptySub:   { fontSize: FontSize.caption, color: Colors.textMuted, textAlign: "center", lineHeight: 28, fontFamily: FontFamily.body },
 });

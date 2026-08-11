@@ -3,14 +3,15 @@ import {
   View, Text, TouchableOpacity, StyleSheet, StatusBar,
   ScrollView, Modal, Alert,
 } from "react-native";
-import { router } from "expo-router";
 import { getLinkData, clearLink, type LinkData } from "@/features/supabase/linkService";
 import { OnboardingScreen } from "@/features/onboarding/OnboardingScreen";
-import { Colors, FontFamily, FontSize, Spacing, Radius, Shadow } from "@/components/tokens";
+import { Colors, FontFamily, FontSize, Spacing, Radius, Shadow, TouchSize } from "@/components/tokens";
+import { getDevStats } from "@/features/recommendation/RecommendationEngine";
 
 export default function SettingsScreen() {
-  const [linkData, setLinkData] = useState<LinkData>({ linked: false });
+  const [linkData, setLinkData]         = useState<LinkData>({ linked: false });
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [devStats, setDevStats]         = useState<{ totalLogs: number; contactCount: number; coldStart: boolean } | null>(null);
 
   useEffect(() => {
     getLinkData().then(setLinkData).catch(() => {});
@@ -26,16 +27,18 @@ export default function SettingsScreen() {
     ]);
   }
 
+  async function handleDevStatsToggle() {
+    if (devStats) { setDevStats(null); return; }
+    const stats = await getDevStats();
+    setDevStats(stats);
+  }
+
   return (
     <View style={s.root}>
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       <View style={s.header}>
-        <TouchableOpacity style={s.headerSide} onPress={() => router.back()}>
-          <Text style={s.backText}>‹ 뒤로</Text>
-        </TouchableOpacity>
         <Text style={s.headerTitle}>설정</Text>
-        <View style={s.headerSide} />
       </View>
 
       <ScrollView contentContainerStyle={s.content}>
@@ -58,7 +61,7 @@ export default function SettingsScreen() {
           </View>
 
           {linkData.linked ? (
-            <TouchableOpacity style={s.dangerBtn} onPress={handleDisconnect}>
+            <TouchableOpacity style={s.dangerBtn} onPress={handleDisconnect} accessibilityLabel="연결 해제">
               <Text style={s.dangerBtnText}>연결 해제</Text>
             </TouchableOpacity>
           ) : (
@@ -81,6 +84,22 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* 개발자 도구 */}
+        <Text style={[s.groupLabel, { marginTop: Spacing.xl }]}>개발자 도구</Text>
+        <View style={[s.card, Shadow.card]}>
+          <TouchableOpacity style={s.devRow} onPress={handleDevStatsToggle}>
+            <Text style={s.devRowText}>추천 엔진 통계</Text>
+            <Text style={s.devChevron}>{devStats ? "▲" : "▼"}</Text>
+          </TouchableOpacity>
+          {devStats && (
+            <View style={s.devStats}>
+              <Text style={s.devStat}>전체 로그: {devStats.totalLogs}건</Text>
+              <Text style={s.devStat}>연락처 수: {devStats.contactCount}명</Text>
+              <Text style={s.devStat}>Cold Start: {devStats.coldStart ? "예 (데이터 부족)" : "아니오"}</Text>
+            </View>
+          )}
+        </View>
+
       </ScrollView>
 
       <Modal visible={showOnboarding} animationType="slide">
@@ -99,8 +118,6 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
 
   header: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: Spacing.lg,
     paddingTop: (StatusBar.currentHeight ?? 24) + 12,
     paddingBottom: 14,
@@ -108,21 +125,17 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  headerSide:  { minWidth: 64 },
   headerTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
     color: Colors.textPrimary,
     fontFamily: FontFamily.heading,
   },
-  backText: { fontSize: 16, color: Colors.primary, fontWeight: "600", fontFamily: FontFamily.body },
 
   content: { padding: Spacing.lg, paddingBottom: 64 },
 
   groupLabel: {
-    fontSize: 11,
+    fontSize: FontSize.caption,
     fontWeight: "700",
     color: Colors.textMuted,
     letterSpacing: 1.4,
@@ -139,20 +152,26 @@ const s = StyleSheet.create({
     gap: Spacing.sm,
   },
 
-  linkRow:  { flexDirection: "row", alignItems: "flex-start", gap: 14 },
+  linkRow:   { flexDirection: "row", alignItems: "flex-start", gap: 14 },
   linkEmoji: { fontSize: 28, marginTop: 2 },
   linkInfo:  { flex: 1, gap: 4 },
   linkName:  { fontSize: FontSize.body, fontWeight: "700", color: Colors.textPrimary, fontFamily: FontFamily.heading },
-  linkDesc:  { fontSize: FontSize.caption, color: Colors.textMuted, lineHeight: 20, fontFamily: FontFamily.bodyRegular },
+  linkDesc:  { fontSize: FontSize.caption, color: Colors.textMuted, lineHeight: 24, fontFamily: FontFamily.body },
 
-  primaryBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 14, alignItems: "center", marginTop: 4 },
+  primaryBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 14, alignItems: "center", marginTop: 4, minHeight: TouchSize.minimum, justifyContent: "center" },
   primaryBtnText: { color: "#FFF", fontSize: FontSize.body, fontWeight: "700", fontFamily: FontFamily.headingMedium },
 
-  dangerBtn:     { borderWidth: 1.5, borderColor: Colors.danger, borderRadius: Radius.pill, paddingVertical: 12, alignItems: "center", marginTop: 4 },
+  dangerBtn:     { borderWidth: 1.5, borderColor: Colors.danger, borderRadius: Radius.pill, paddingVertical: 14, alignItems: "center", marginTop: 4, minHeight: TouchSize.minimum, justifyContent: "center" },
   dangerBtnText: { color: Colors.danger, fontSize: FontSize.body, fontWeight: "600", fontFamily: FontFamily.body },
 
-  infoRow:       { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12 },
+  infoRow:       { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14, minHeight: 48 },
   infoRowBorder: { borderTopWidth: 1, borderTopColor: Colors.border },
   infoKey:       { fontSize: FontSize.caption, color: Colors.textMuted, fontFamily: FontFamily.body },
   infoVal:       { fontSize: FontSize.caption, color: Colors.textPrimary, fontWeight: "600", fontFamily: FontFamily.body },
+
+  devRow:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12, minHeight: 48 },
+  devRowText: { fontSize: FontSize.body, color: Colors.textPrimary, fontFamily: FontFamily.body },
+  devChevron: { fontSize: FontSize.body, color: Colors.textMuted },
+  devStats:   { gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.border },
+  devStat:    { fontSize: FontSize.caption, color: Colors.textSecondary, fontFamily: FontFamily.body },
 });

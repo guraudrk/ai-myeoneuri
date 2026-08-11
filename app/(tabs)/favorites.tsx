@@ -3,7 +3,6 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Alert, StatusBar, Modal, TextInput, ActivityIndicator,
 } from "react-native";
-import { router } from "expo-router";
 import { getFavorites, addFavorite, removeFavorite, type FavoriteContact } from "@/features/favorites/FavoritesAdapter";
 import { createRealContactsAdapter } from "@/features/contacts/RealContactsAdapter";
 import { createRealPhoneAdapter } from "@/features/calling/RealPhoneAdapter";
@@ -13,15 +12,15 @@ import { Colors, FontFamily, FontSize, Spacing, Radius, Shadow, TouchSize } from
 import type { ContactCandidate } from "@/domain/types";
 
 const contactsAdapter = createRealContactsAdapter();
-const phoneAdapter = createRealPhoneAdapter();
+const phoneAdapter    = createRealPhoneAdapter();
 let reqCounter = 0;
 function nextReqId() { return `fav-${++reqCounter}-${Date.now()}`; }
 
 export default function FavoritesScreen() {
   const [favorites, setFavorites] = useState<FavoriteContact[]>([]);
-  const [showAdd, setShowAdd] = useState(false);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ContactCandidate[]>([]);
+  const [showAdd, setShowAdd]     = useState(false);
+  const [query, setQuery]         = useState("");
+  const [results, setResults]     = useState<ContactCandidate[]>([]);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => { load(); }, []);
@@ -71,12 +70,9 @@ export default function FavoritesScreen() {
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       <View style={s.header}>
-        <TouchableOpacity style={s.headerSide} onPress={() => router.back()}>
-          <Text style={s.backText}>‹ 뒤로</Text>
-        </TouchableOpacity>
         <Text style={s.headerTitle}>즐겨찾기</Text>
-        <TouchableOpacity style={[s.headerSide, s.headerRight]} onPress={() => setShowAdd(true)}>
-          <Text style={s.addText}>+ 추가</Text>
+        <TouchableOpacity style={s.addBtn} onPress={() => setShowAdd(true)} accessibilityLabel="연락처 추가">
+          <Text style={s.addBtnText}>+ 추가</Text>
         </TouchableOpacity>
       </View>
 
@@ -100,17 +96,16 @@ export default function FavoritesScreen() {
               <Text style={s.avatarText}>{initial(item.name)}</Text>
             </View>
             <Text style={s.name} numberOfLines={1}>{item.name}</Text>
-            <TouchableOpacity style={s.callBtn} onPress={() => handleCall(item)}>
+            <TouchableOpacity style={s.callBtn} onPress={() => handleCall(item)} accessibilityLabel={`${item.name} 전화`}>
               <Text style={s.callBtnText}>📞 전화</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.delBtn} onPress={() => handleRemove(item)}>
+            <TouchableOpacity style={s.delBtn} onPress={() => handleRemove(item)} accessibilityLabel={`${item.name} 삭제`}>
               <Text style={s.delBtnText}>×</Text>
             </TouchableOpacity>
           </View>
         )}
       />
 
-      {/* 연락처 검색 모달 */}
       <Modal
         visible={showAdd}
         animationType="slide"
@@ -119,11 +114,10 @@ export default function FavoritesScreen() {
         <View style={s.root}>
           <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
           <View style={s.header}>
-            <TouchableOpacity style={s.headerSide} onPress={() => { setShowAdd(false); setQuery(""); }}>
-              <Text style={s.backText}>취소</Text>
-            </TouchableOpacity>
             <Text style={s.headerTitle}>연락처 검색</Text>
-            <View style={s.headerSide} />
+            <TouchableOpacity style={s.addBtn} onPress={() => { setShowAdd(false); setQuery(""); }}>
+              <Text style={s.addBtnText}>닫기</Text>
+            </TouchableOpacity>
           </View>
           <View style={s.searchBar}>
             <TextInput
@@ -171,19 +165,16 @@ const s = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    justifyContent: "space-between",
   },
-  headerSide:  { minWidth: 64 },
-  headerRight: { alignItems: "flex-end" },
   headerTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
     color: Colors.textPrimary,
     fontFamily: FontFamily.heading,
   },
-  backText: { fontSize: 16, color: Colors.primary, fontWeight: "600", fontFamily: FontFamily.body },
-  addText:  { fontSize: 15, color: Colors.primary, fontWeight: "600", fontFamily: FontFamily.body },
+  addBtn:     { minHeight: TouchSize.minimum, justifyContent: "center", paddingHorizontal: 4 },
+  addBtnText: { fontSize: FontSize.body, color: Colors.primary, fontWeight: "600", fontFamily: FontFamily.body },
 
   list:       { padding: Spacing.lg, gap: Spacing.sm, paddingBottom: 40 },
   listCenter: { flex: 1 },
@@ -195,25 +186,26 @@ const s = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.md,
     gap: 12,
+    minHeight: TouchSize.minimum,
   },
-  avatar:     { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  avatarText: { fontSize: 22, color: "#FFF", fontWeight: "700" },
+  avatar:     { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  avatarText: { fontSize: FontSize.body, color: "#FFF", fontWeight: "700" },
   name:       { flex: 1, fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary, fontFamily: FontFamily.body },
 
-  callBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 14, minHeight: 44, justifyContent: "center" },
-  callBtnText: { color: "#FFF", fontSize: 14, fontWeight: "700", fontFamily: FontFamily.body },
+  callBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 10, paddingHorizontal: 16, minHeight: 44, justifyContent: "center" },
+  callBtnText: { color: "#FFF", fontSize: FontSize.caption, fontWeight: "700" },
 
-  delBtn:     { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.background, alignItems: "center", justifyContent: "center" },
-  delBtnText: { fontSize: 20, color: Colors.textMuted },
+  delBtn:     { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.background, alignItems: "center", justifyContent: "center" },
+  delBtnText: { fontSize: 22, color: Colors.textMuted },
 
-  addHint: { fontSize: 14, color: Colors.primary, fontWeight: "600", fontFamily: FontFamily.body },
+  addHint: { fontSize: FontSize.caption, color: Colors.primary, fontWeight: "600" },
 
   empty:      { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, paddingTop: 60 },
   emptyEmoji: { fontSize: 64 },
   emptyTitle: { fontSize: FontSize.heading, fontWeight: "700", color: Colors.textPrimary, fontFamily: FontFamily.heading },
-  emptySub:   { fontSize: FontSize.caption, color: Colors.textMuted, textAlign: "center", lineHeight: 24, fontFamily: FontFamily.bodyRegular },
+  emptySub:   { fontSize: FontSize.caption, color: Colors.textMuted, textAlign: "center", lineHeight: 28, fontFamily: FontFamily.body },
 
-  ctaBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 14, paddingHorizontal: 28, marginTop: 8 },
+  ctaBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.pill, paddingVertical: 16, paddingHorizontal: 28, marginTop: 8, minHeight: TouchSize.minimum, justifyContent: "center" },
   ctaBtnText: { color: "#FFF", fontSize: FontSize.body, fontWeight: "700", fontFamily: FontFamily.headingMedium },
 
   searchBar:   { padding: Spacing.lg, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
@@ -221,7 +213,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.background,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: FontSize.body,
     color: Colors.textPrimary,
     fontFamily: FontFamily.body,
