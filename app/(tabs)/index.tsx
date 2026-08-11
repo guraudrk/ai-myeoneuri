@@ -816,9 +816,9 @@ const s = StyleSheet.create({
   idleRoot:  { flex: 1, backgroundColor: Colors.surface },
   idleInner: {
     flex: 1,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: (StatusBar.currentHeight ?? 28) + 12,
-    paddingBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: (StatusBar.currentHeight ?? 28) + 20,
+    paddingBottom: Spacing.xl,
     alignItems: "center",
     justifyContent: "space-between",
   },
@@ -844,7 +844,7 @@ const s = StyleSheet.create({
     fontWeight: "800",
     color: Colors.textPrimary,
     textAlign: "center",
-    lineHeight: 52,
+    lineHeight: 56,
     fontFamily: FontFamily.heading,
   },
 
@@ -853,13 +853,13 @@ const s = StyleSheet.create({
     width: "100%",
     backgroundColor: Colors.primaryTint,
     borderRadius: Radius.lg,
-    padding: Spacing.md,
-    gap: Spacing.sm,
+    padding: Spacing.lg,
+    gap: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.primary + "33",
   },
   recLabel:  { fontSize: FontSize.caption, color: Colors.primary, fontWeight: "700", fontFamily: FontFamily.headingMedium },
-  recReason: { fontSize: FontSize.body,    color: Colors.textPrimary, fontFamily: FontFamily.body, lineHeight: 30 },
+  recReason: { fontSize: FontSize.body,    color: Colors.textPrimary, fontFamily: FontFamily.body, lineHeight: 34 },
 
   micWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
 
