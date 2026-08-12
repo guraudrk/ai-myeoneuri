@@ -48,6 +48,7 @@ export type ParsedIntent =
   | { intent: "general_question"; utterance: string }
   | { intent: "safety_concern"; category: SafetyCategory; severity: SafetySeverity; utterance: string }
   | { intent: "open_app"; appName: string; packageName: string }
+  | { intent: "add_to_favorites"; contactName: string }
   | { intent: "date_time" }
   | { intent: "conversation_summary" }
   | { intent: "emergency_family" }
@@ -290,12 +291,13 @@ export async function parseIntent(
 8. 오늘 한 일·대화 기록 요청(오늘 뭐 했어, 기록 알려줘, 뭐 이야기했어, 오늘 뭐 했는지) → conversation_summary
 9. 가족·보호자 호출(가족 불러줘, 아들한테 연락해줘, 딸 불러줘, 누군가 불러줘, 보호자 불러줘, 도움 필요해) → emergency_family
 10. 당황·불안·혼란 표현(무서워, 어떡하지, 모르겠어, 이상해, 무슨 일이야, 어디야, 어떻게 해야 해) → calm_down
-11. 위 외의 모든 질문 → general_question
+11. 즐겨찾기·자주 통화에 추가, 가족으로 저장(추가해줘, 저장해줘, 즐겨찾기, 가족 등록) → add_to_favorites. contact_name: 추가할 사람 이름.
+12. 위 외의 모든 질문 → general_question
 
 [JSON 스키마]
 {
-  "intent": "call_contact"|"search_business"|"set_reminder"|"open_app"|"safety_concern"|"date_time"|"conversation_summary"|"emergency_family"|"calm_down"|"general_question"|"sos"|"unknown",
-  "contact_name": "(call_contact)",
+  "intent": "call_contact"|"search_business"|"set_reminder"|"open_app"|"safety_concern"|"add_to_favorites"|"date_time"|"conversation_summary"|"emergency_family"|"calm_down"|"general_question"|"sos"|"unknown",
+  "contact_name": "(call_contact 또는 add_to_favorites)",
   "business_query": "(search_business)",
   "medicine": "(set_reminder)",
   "time": "HH:MM (set_reminder)",
@@ -352,6 +354,8 @@ export async function parseIntent(
         return { intent: "emergency_family" };
       case "calm_down":
         return { intent: "calm_down" };
+      case "add_to_favorites":
+        return { intent: "add_to_favorites", contactName: parsed.contact_name ?? "" };
       case "general_question":
         return { intent: "general_question", utterance };
       case "sos":

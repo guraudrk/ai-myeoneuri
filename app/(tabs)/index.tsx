@@ -330,6 +330,36 @@ export default function HomeScreen() {
       return;
     }
 
+    if (parsed.intent === "add_to_favorites") {
+      const targetName = parsed.contactName || query;
+      const result = await searchContacts(targetName, contactsAdapter);
+      if (result.status === "permission_denied") {
+        setScreen({ type: "permission_denied", reason: "contacts" });
+      } else if (result.status === "no_results" || result.status === "unmapped_relationship") {
+        setScreen({ type: "idle" });
+        Alert.alert("", "연락처를 찾지 못했어요.\n이름을 정확하게 말씀해 주세요.");
+        speak("연락처를 찾지 못했어요. 이름을 정확하게 말씀해 주세요.").catch(() => {});
+      } else {
+        const top = result.candidates[0];
+        Alert.alert(
+          "즐겨찾기 추가",
+          `${top.name} 님을 즐겨찾기에 추가할까요?`,
+          [
+            { text: "취소", style: "cancel", onPress: () => setScreen({ type: "idle" }) },
+            { text: "추가할게요", onPress: async () => {
+              await addFavorite({ id: top.id, name: top.name });
+              setFavorites(await getFavorites());
+              speak(`${top.name} 님을 즐겨찾기에 추가했어요.`).catch(() => {});
+              await addLog("⭐", `${top.name} 즐겨찾기 추가`);
+              loadTodayLogs();
+              setScreen({ type: "idle" });
+            }},
+          ]
+        );
+      }
+      return;
+    }
+
     if (parsed.intent === "emergency_family") {
       const favs = await getFavorites();
       if (favs.length > 0) {
