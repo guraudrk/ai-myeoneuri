@@ -46,12 +46,6 @@ function groupByContact(logs: EventLog[]): Map<string, EventLog[]> {
   return m;
 }
 
-/** 0~1 정규화 */
-function normalize(val: number, min: number, max: number): number {
-  if (max === min) return 0.5;
-  return Math.min(1, Math.max(0, (val - min) / (max - min)));
-}
-
 /** 야간 억제 확인 */
 function isNighttime(): boolean {
   const h = new Date().getHours();
@@ -168,7 +162,6 @@ export async function getTopRecommendation(): Promise<Recommendation | null> {
   if (isNighttime()) return null;
 
   const logs    = await getRecentLogs(30);
-  const coldStart = logs.length > 0 && (Date.now() - Math.min(...logs.map((e) => e.startedAt))) < FILTERS.coldStartDays * 86_400_000;
   if (logs.length < 3) return null;                         // 데이터 부족 (cold start)
 
   const byContact     = groupByContact(logs);

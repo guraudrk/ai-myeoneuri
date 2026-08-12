@@ -45,7 +45,8 @@ import {
   type FavoriteContact,
 } from "@/features/favorites/FavoritesAdapter";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getLinkData, type LinkData } from "@/features/supabase/linkService";
+import { getLinkData, clearLink, type LinkData } from "@/features/supabase/linkService";
+import { OnboardingScreen } from "@/features/onboarding/OnboardingScreen";
 import { useFocusEffect } from "expo-router";
 import type { ContactCandidate } from "@/domain/types";
 import type { BusinessCandidate } from "@/features/business/BusinessSearchAdapter";
@@ -109,6 +110,7 @@ export default function HomeScreen() {
   const [showTextInput, setShowTextInput] = useState(false);
   const [searchingMsg, setSearchingMsg]   = useState("찾고 있어요…");
   const [linkData, setLinkData]           = useState<LinkData>({ linked: false });
+  const [showSettings, setShowSettings]   = useState(false);
   const [rec, setRec]                     = useState<Recommendation | null>(null);
   const [relSearch, setRelSearch] = useState("");
   const [contactPickerSearch, setContactPickerSearch] = useState("");
@@ -563,6 +565,45 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* ─── 가족 연결 설정: 미연결 → 풀스크린 온보딩 ─── */}
+      <Modal visible={showSettings && !linkData.linked} animationType="slide">
+        <OnboardingScreen
+          onDone={() => {
+            setShowSettings(false);
+            getLinkData().then(setLinkData).catch(() => {});
+          }}
+        />
+      </Modal>
+
+      {/* ─── 가족 연결 설정: 연결됨 → 바텀시트 ─── */}
+      <Modal visible={showSettings && linkData.linked} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={[s.modalCard, Shadow.card]}>
+            <Text style={s.modalTitle}>🔗 가족 연결 설정</Text>
+            <View style={s.linkedStateBox}>
+              <Text style={s.linkedStateLabel}>현재 연결된 어르신</Text>
+              <Text style={s.linkedStateName}>{(linkData as { linked: true; elderName: string }).elderName}</Text>
+            </View>
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.danger }]}
+              onPress={() => Alert.alert("연결 해제", "SilverLink 연결을 해제할까요?", [
+                { text: "취소", style: "cancel" },
+                { text: "해제", style: "destructive", onPress: async () => {
+                  await clearLink();
+                  setLinkData({ linked: false });
+                  setShowSettings(false);
+                }},
+              ])}
+            >
+              <Text style={s.primaryBtnText}>연결 해제</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.ghostBtn} onPress={() => setShowSettings(false)}>
+              <Text style={s.ghostBtnText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ─── 전화 카운트다운 다이얼로그 ─── */}
       <CallCountdownDialog
         visible={screen.type === "countdown_contact"}
@@ -666,6 +707,13 @@ export default function HomeScreen() {
                   <Text style={s.textInputBtnText}>⌨️ 직접 입력</Text>
                 </TouchableOpacity>
               </View>
+              <TouchableOpacity
+                style={s.settingsEntryBtn}
+                onPress={() => setShowSettings(true)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={s.settingsEntryText}>⚙ 가족 연결 설정</Text>
+              </TouchableOpacity>
             </View>
 
         </ScrollView>
@@ -1221,4 +1269,11 @@ const s = StyleSheet.create({
   modalCard:    { backgroundColor: Colors.surface, borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg, padding: Spacing.xl, gap: Spacing.md },
   modalTitle:   { fontSize: FontSize.heading, fontWeight: "700", color: Colors.textPrimary, textAlign: "center", fontFamily: FontFamily.heading },
   modalInput:   { backgroundColor: Colors.background, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: 14, fontSize: FontSize.body, color: Colors.textPrimary, minHeight: TouchSize.minimum },
+
+  settingsEntryBtn: { alignSelf: "center", paddingVertical: 6, paddingHorizontal: 12 },
+  settingsEntryText: { fontSize: 12, color: Colors.textMuted, fontWeight: "500" },
+
+  linkedStateBox: { backgroundColor: Colors.primaryTint, borderRadius: Radius.md, padding: Spacing.md, alignItems: "center", gap: 4 },
+  linkedStateLabel: { fontSize: FontSize.caption, color: Colors.primary, fontWeight: "600" },
+  linkedStateName:  { fontSize: FontSize.heading, fontWeight: "800", color: Colors.textPrimary, fontFamily: FontFamily.heading },
 });

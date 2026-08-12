@@ -8,7 +8,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import {
   appendEventLog,
-  getRecentLogs,
   snoozeRecommendation,
   markRecommendationShown,
 } from "../src/features/recommendation/EventLogService";
@@ -175,7 +174,7 @@ describe("야간 억제", () => {
     await addCall(CONTACT_A, daysAgo(20));
     await addCall(CONTACT_A, daysAgo(10));
     await addCall(CONTACT_A, daysAgo(5));  // deviation 0.5 → score 낮을 수 있음
-    const rec = await getTopRecommendation();
+    await getTopRecommendation();
     // null이 아닐 수도 있고 최소 임계값 미달로 null일 수도 있음 — 야간은 아님을 확인
     jest.useRealTimers();
   });
