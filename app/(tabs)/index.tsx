@@ -98,7 +98,7 @@ type ScreenState =
   | { type: "safety_alert"; category: string; severity: SafetySeverity; utterance: string }
   | { type: "app_candidates"; candidates: AppCandidate[]; appFamily: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
-  | { type: "relationship_picker"; relationship: string; allContacts: ContactCandidate[] };
+  | { type: "relationship_picker"; relationship: string; allContacts: ContactCandidate[]; favoritesMode?: boolean };
 
 export default function HomeScreen() {
   const [input, setInput]               = useState("");
@@ -335,7 +335,10 @@ export default function HomeScreen() {
       const result = await searchContacts(targetName, contactsAdapter);
       if (result.status === "permission_denied") {
         setScreen({ type: "permission_denied", reason: "contacts" });
-      } else if (result.status === "no_results" || result.status === "unmapped_relationship") {
+      } else if (result.status === "unmapped_relationship") {
+        const all = await contactsAdapter.searchContacts("");
+        setScreen({ type: "relationship_picker", relationship: result.relationship, allContacts: all, favoritesMode: true });
+      } else if (result.status === "no_results") {
         setScreen({ type: "idle" });
         Alert.alert("", "연락처를 찾지 못했어요.\n이름을 정확하게 말씀해 주세요.");
         speak("연락처를 찾지 못했어요. 이름을 정확하게 말씀해 주세요.").catch(() => {});
@@ -519,6 +522,15 @@ export default function HomeScreen() {
   }
 
   async function handleRelationshipSelect(relationship: string, candidate: ContactCandidate) {
+    if (screen.type === "relationship_picker" && screen.favoritesMode) {
+      await addFavorite({ id: candidate.id, name: candidate.name });
+      setFavorites(await getFavorites());
+      speak(`${candidate.name} 님을 즐겨찾기에 추가했어요.`).catch(() => {});
+      await addLog("⭐", `${candidate.name} 즐겨찾기 추가`);
+      loadTodayLogs();
+      setScreen({ type: "idle" });
+      return;
+    }
     await saveMapping(relationship, candidate.id);
     setScreen({ type: "confirming_contact", candidate, requestId: nextRequestId() });
   }
@@ -995,8 +1007,12 @@ export default function HomeScreen() {
                   return (
                     <>
                       <View style={s.relationshipHeader}>
-                        <Text style={s.sectionTitle}>어느 분이 '{screen.relationship}'이에요?</Text>
-                        <Text style={s.relationshipSub}>한 번 알려주시면 다음엔 바로 전화할게요 😊</Text>
+                        <Text style={s.sectionTitle}>
+                          {screen.favoritesMode ? "누구를 즐겨찾기에 추가할까요?" : `어느 분이 '${screen.relationship}'이에요?`}
+                        </Text>
+                        <Text style={s.relationshipSub}>
+                          {screen.favoritesMode ? "추가할 분을 선택해 주세요" : "한 번 알려주시면 다음엔 바로 전화할게요 😊"}
+                        </Text>
                       </View>
                       <TextInput
                         style={s.relSearchInput}

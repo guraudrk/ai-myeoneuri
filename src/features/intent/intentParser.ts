@@ -290,7 +290,7 @@ export async function parseIntent(
 7. 날짜·시간·요일 물어보기(오늘 날짜, 몇 시, 무슨 요일, 지금 시간) → date_time
 8. 오늘 한 일·대화 기록 요청(오늘 뭐 했어, 기록 알려줘, 뭐 이야기했어, 오늘 뭐 했는지) → conversation_summary
 9. 가족·보호자 호출(가족 불러줘, 아들한테 연락해줘, 딸 불러줘, 누군가 불러줘, 보호자 불러줘, 도움 필요해) → emergency_family
-10. 당황·불안·혼란 표현(무서워, 어떡하지, 모르겠어, 이상해, 무슨 일이야, 어디야, 어떻게 해야 해) → calm_down
+10. 당황·불안·혼란 표현(무서워, 어떡하지, 모르겠어, 이상해, 무슨 일이야, 어떻게 해야 해) → calm_down
 11. 즐겨찾기·자주 통화에 추가, 가족으로 저장(추가해줘, 저장해줘, 즐겨찾기, 가족 등록) → add_to_favorites. contact_name: 추가할 사람 이름.
 12. 위 외의 모든 질문 → general_question
 
@@ -314,6 +314,8 @@ export async function parseIntent(
 - "오늘 뭐 했어?" → {"intent":"conversation_summary"}
 - "가족 불러줘" → {"intent":"emergency_family"}
 - "무서워요" → {"intent":"calm_down"}
+- "엄마 즐겨찾기에 추가해줘" → {"intent":"add_to_favorites","contact_name":"엄마"}
+- "홍길동 저장해줘" → {"intent":"add_to_favorites","contact_name":"홍길동"}
 - "오늘 날씨 어때?" → {"intent":"general_question"}` }] }],
         generationConfig: { temperature: 0 },
       },
