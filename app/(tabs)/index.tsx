@@ -36,6 +36,8 @@ import { createKakaoBusinessSearchAdapter } from "@/features/business/KakaoBusin
 import { createExpoSpeechAdapter } from "@/features/speech/ExpoSpeechAdapter";
 import { parseIntent, askGemini, openAppByName, readPaperWithGemini } from "@/features/intent/intentParser";
 import * as ImagePicker from "expo-image-picker";
+import { detectSmishing } from "@/features/safety/smishingRules";
+import { startSmsListening, stopSmsListening, addSmsListener } from "@/features/safety/SmsReceiverAdapter";
 import type { SafetySeverity } from "@/features/intent/intentParser";
 import { speak, stop as ttsStop } from "@/features/tts/TtsService";
 import { addLog, getTodayLogs, type LogEntry } from "@/features/conversation-log/ConversationLogService";
@@ -118,7 +120,8 @@ type ScreenState =
   | { type: "relationship_picker"; relationship: string; allContacts: ContactCandidate[]; favoritesMode?: boolean }
   | { type: "unknown_confirm"; utterance: string }
   | { type: "reading_paper" }
-  | { type: "paper_result"; text: string };
+  | { type: "paper_result"; text: string }
+  | { type: "smishing_alert"; sender: string; body: string; risk: "high" | "medium" };
 
 export default function HomeScreen() {
   const [input, setInput]               = useState("");
@@ -152,10 +155,19 @@ export default function HomeScreen() {
     isAnomalyDetectionEnabled().then(setAnomalyEnabled).catch(() => {});
     hasUsagePermission().then(setHasAnomalyPermission).catch(() => {});
     checkAnomalyOnce();
+    // F2-2: SMS 리스너 시작
+    startSmsListening();
+    const removeSmsListener = addSmsListener(({ sender, body }) => {
+      const result = detectSmishing(body);
+      if (result.risk === "high" || result.risk === "medium") {
+        setScreen({ type: "smishing_alert", sender, body, risk: result.risk });
+        speak("위험한 문자가 왔어요. 주의하세요.").catch(() => {});
+      }
+    });
     AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
       .then(() => AnalyticsService.flush())
       .catch(() => {});
-    return () => { ttsStop(); };
+    return () => { ttsStop(); stopSmsListening(); removeSmsListener(); };
   }, []);
 
   // 탭 전환 후 돌아올 때 즐겨찾기 갱신
@@ -1321,6 +1333,31 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+
+      {/* F2-2: 스미싱 경고 */}
+      {screen.type === "smishing_alert" && (
+        <View style={[s.centerFull, { paddingHorizontal: Spacing.lg }]}>
+          <View style={[s.paperCard, { borderWidth: 2, borderColor: Colors.danger }]}>
+            <Text style={s.smishingIcon}>⚠️</Text>
+            <Text style={s.smishingTitle}>
+              {screen.risk === "high" ? "위험한 문자예요!" : "수상한 문자예요"}
+            </Text>
+            <Text style={s.smishingSender}>보낸 번호: {screen.sender || "알 수 없음"}</Text>
+            <Text style={s.smishingBody} numberOfLines={4}>{screen.body}</Text>
+            <Text style={s.smishingAdvice}>
+              {screen.risk === "high"
+                ? "절대 링크를 누르거나 개인정보를 알려주지 마세요."
+                : "가족에게 먼저 확인해 보세요."}
+            </Text>
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.danger }]}
+              onPress={handleReset}
+            >
+              <Text style={s.primaryBtnText}>확인했어요</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -1631,6 +1668,33 @@ const s = StyleSheet.create({
     color: Colors.textPrimary,
     lineHeight: FontSize.heading * 1.6,
     textAlign: "center",
+  },
+
+  // F2-2 smishing alert
+  smishingIcon: { fontSize: 48, textAlign: "center" },
+  smishingTitle: {
+    fontSize: FontSize.headingLarge,
+    fontWeight: "800",
+    color: Colors.danger,
+    fontFamily: FontFamily.heading,
+    textAlign: "center",
+  },
+  smishingSender: { fontSize: FontSize.body, color: Colors.textMuted, textAlign: "center" },
+  smishingBody: {
+    fontSize: FontSize.body,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+    width: "100%",
+    lineHeight: FontSize.body * 1.5,
+  },
+  smishingAdvice: {
+    fontSize: FontSize.body,
+    fontWeight: "600",
+    color: Colors.danger,
+    textAlign: "center",
+    lineHeight: FontSize.body * 1.5,
   },
 
   // B-7 unknown_confirm
