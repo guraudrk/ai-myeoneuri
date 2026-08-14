@@ -15,8 +15,8 @@
 - **Primary user:** 스마트폰 메뉴와 작은 글씨 사용이 어려운 고령자
 - **Secondary user:** 자녀·보호자
 - **Core outcome:** 사용자가 자연어로 말하면 앱이 안전한 실행 계획을 만들고, 필요한 확인을 받은 뒤 Android 작업을 수행하고 결과를 알려준다.
-- **Current priority:** 가장 작은 실제 Android Vertical Slice를 반복적으로 완성한다.
-- **Current first slice:** 음성·텍스트 입력 → 연락처 검색 → 확인 → 전화/Dialer → 결과 기록
+- **Current priority:** B2C 유료 전환 퍼널 구축 — `docs/PRD-B2C-1000subs.md` 기준. 순서: F0 계측 → F1 결제 → F2 스미싱 방어 → F3 자녀 웹 → F4 리텐션. F2 완료 시점에 마케팅 개시.
+- **Current first slice:** F0 — AnalyticsService.ts + Supabase events 테이블 + 계층형 의도해석(L0/L1 무료, L3 Gemini Flash 유료)
 - **Language:** 사용자 UI와 사용자 대상 문서는 한국어를 기본으로 한다.
 - **Code language:** TypeScript와 Kotlin
 - **Default package manager:** `npm`
