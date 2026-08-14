@@ -102,6 +102,9 @@ beforeEach(() => {
   // 키를 직접 할당 (process.env 교체 X, Jest node 환경에서 교체 시 무효)
   process.env.EXPO_PUBLIC_GEMINI_API_KEY = "test-key";
   (globalThis as unknown as { fetch: jest.Mock }).fetch = jest.fn();
+  // L1 캐시 오염 방지 — 테스트마다 AsyncStorage를 초기화한다
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("@react-native-async-storage/async-storage").default.clear();
 });
 
 afterEach(() => {
@@ -113,26 +116,26 @@ describe("parseIntent() — JSON 파싱", () => {
   test("call_contact", async () => {
     mockGeminiResponse({ intent: "call_contact", contact_name: "딸" });
     const r = await parseIntent("딸한테 전화해줘");
-    expect(r).toEqual({ intent: "call_contact", contactName: "딸" });
+    expect(r).toMatchObject({ intent: "call_contact", contactName: "딸" });
   });
 
   test("search_business", async () => {
     mockGeminiResponse({ intent: "search_business", business_query: "치킨" });
     const r = await parseIntent("치킨집 찾아줘");
-    expect(r).toEqual({ intent: "search_business", query: "치킨" });
+    expect(r).toMatchObject({ intent:"search_business", query: "치킨" });
   });
 
   test("set_reminder", async () => {
     mockGeminiResponse({ intent: "set_reminder", medicine: "혈압약", time: "09:00" });
     const r = await parseIntent("혈압약 9시에 알려줘");
-    expect(r).toEqual({ intent: "set_reminder", medicineName: "혈압약", timeHHMM: "09:00" });
+    expect(r).toMatchObject({ intent:"set_reminder", medicineName: "혈압약", timeHHMM: "09:00" });
   });
 
   test("open_app — packageName은 appPackages에서 해석", async () => {
     // Gemini는 package_name 없이 app_name만 반환; resolvePackageName이 매핑
     mockGeminiResponse({ intent: "open_app", app_name: "유튜브" });
     const r = await parseIntent("유튜브 켜줘");
-    expect(r).toEqual({ intent: "open_app", appName: "유튜브", packageName: "com.google.android.youtube" });
+    expect(r).toMatchObject({ intent:"open_app", appName: "유튜브", packageName: "com.google.android.youtube" });
   });
 
   test("safety_concern — fall_risk", async () => {
@@ -148,43 +151,43 @@ describe("parseIntent() — JSON 파싱", () => {
   test("general_question", async () => {
     mockGeminiResponse({ intent: "general_question" });
     const r = await parseIntent("오늘 날씨 어때?");
-    expect(r).toEqual({ intent: "general_question", utterance: "오늘 날씨 어때?" });
+    expect(r).toMatchObject({ intent:"general_question", utterance: "오늘 날씨 어때?" });
   });
 
   test("sos", async () => {
     mockGeminiResponse({ intent: "sos" });
     const r = await parseIntent("살려줘");
-    expect(r).toEqual({ intent: "sos" });
+    expect(r).toMatchObject({ intent:"sos" });
   });
 
   test("date_time", async () => {
     mockGeminiResponse({ intent: "date_time" });
     const r = await parseIntent("오늘 날짜 알려줘");
-    expect(r).toEqual({ intent: "date_time" });
+    expect(r).toMatchObject({ intent:"date_time" });
   });
 
   test("conversation_summary", async () => {
     mockGeminiResponse({ intent: "conversation_summary" });
     const r = await parseIntent("오늘 뭐 했어?");
-    expect(r).toEqual({ intent: "conversation_summary" });
+    expect(r).toMatchObject({ intent:"conversation_summary" });
   });
 
   test("emergency_family", async () => {
     mockGeminiResponse({ intent: "emergency_family" });
     const r = await parseIntent("가족 불러줘");
-    expect(r).toEqual({ intent: "emergency_family" });
+    expect(r).toMatchObject({ intent:"emergency_family" });
   });
 
   test("calm_down", async () => {
     mockGeminiResponse({ intent: "calm_down" });
     const r = await parseIntent("무서워요");
-    expect(r).toEqual({ intent: "calm_down" });
+    expect(r).toMatchObject({ intent:"calm_down" });
   });
 
   test("알 수 없는 intent → unknown", async () => {
     mockGeminiResponse({ intent: "whatever_unknown" });
     const r = await parseIntent("뭐지?");
-    expect(r).toEqual({ intent: "unknown" });
+    expect(r).toMatchObject({ intent:"unknown" });
   });
 });
 
@@ -198,7 +201,7 @@ describe("parseIntent() — 특수 케이스", () => {
       }),
     });
     const r = await parseIntent("살려줘");
-    expect(r).toEqual({ intent: "sos" });
+    expect(r).toMatchObject({ intent:"sos" });
   });
 
   test("깨진 JSON → unknown 반환 (예외 삼키지 않음)", async () => {
@@ -210,7 +213,7 @@ describe("parseIntent() — 특수 케이스", () => {
       }),
     });
     const r = await parseIntent("?");
-    expect(r).toEqual({ intent: "unknown" });
+    expect(r).toMatchObject({ intent:"unknown" });
   });
 
   test("safety_category 누락 시 urgent_medical 기본값", async () => {
@@ -235,6 +238,6 @@ describe("parseIntent() — 특수 케이스", () => {
   test("HTTP 503 → unknown 반환", async () => {
     ((globalThis as unknown as { fetch: jest.Mock }).fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 503 });
     const r = await parseIntent("테스트");
-    expect(r).toEqual({ intent: "unknown" });
+    expect(r).toMatchObject({ intent:"unknown" });
   });
 });

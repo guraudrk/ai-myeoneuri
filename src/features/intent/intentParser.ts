@@ -1,5 +1,7 @@
 import { NativeModules, AppState } from "react-native";
 import { resolvePackageName } from "./appPackages";
+import { tryL0 } from "./intentL0";
+import { getFromL1Cache, saveToL1Cache } from "./intentL1Cache";
 
 function getGeminiKey() { return process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? ""; }
 function getGeminiUrl() { return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${getGeminiKey()}`; }
@@ -266,7 +268,8 @@ export async function askGemini(
 }
 
 // ─── 인텐트 분류 ─────────────────────────────────────────────────────────────
-export async function parseIntent(
+/** L3 Gemini Flash 전용 분류기 (내부 사용) */
+async function parseIntentL3(
   utterance: string,
   opts?: { onRetry?: () => void }
 ): Promise<ParsedIntent> {
@@ -368,7 +371,29 @@ export async function parseIntent(
         return { intent: "unknown" };
     }
   } catch (e) {
-    __DEV__ && console.warn("[Gemini] parseIntent 예외", e);
+    __DEV__ && console.warn("[Gemini] parseIntentL3 예외", e);
     return { intent: "unknown" };
   }
+}
+
+/**
+ * 폭포식 의도해석: L0(슬롯 템플릿) → L1(개인 캐시) → L3(Gemini Flash)
+ * resolved_by 필드로 어느 계층이 처리했는지 추적한다.
+ */
+export async function parseIntent(
+  utterance: string,
+  opts?: { onRetry?: () => void }
+): Promise<ParsedIntent> {
+  // L0: 비용 0원, 즉시
+  const l0 = tryL0(utterance);
+  if (l0) return l0;
+
+  // L1: 비용 0원, AsyncStorage
+  const l1 = await getFromL1Cache(utterance);
+  if (l1) return l1;
+
+  // L3: Gemini Flash (유료)
+  const l3 = await parseIntentL3(utterance, opts);
+  await saveToL1Cache(utterance, l3);
+  return { ...l3, resolved_by: "L3" };
 }
