@@ -41,6 +41,12 @@ import { detectSmishing } from "@/features/safety/smishingRules";
 import { startSmsListening, stopSmsListening, addSmsListener } from "@/features/safety/SmsReceiverAdapter";
 import { startCallStateListening, stopCallStateListening, addIncomingCallListener, addCallActiveListener, addCallEndedListener } from "@/features/safety/CallStateAdapter";
 import { startKeywordListening, stopKeywordListening, addKeywordListener } from "@/features/safety/CallKeywordAdapter";
+import {
+  isDailyGreetingEnabled,
+  scheduleDailyGreeting,
+  cancelDailyGreeting,
+} from "@/features/retention/DailyGreetingService";
+import { getRecentLogs } from "@/features/recommendation/EventLogService";
 import { isNumberInContacts } from "@/features/safety/ContactNumberChecker";
 import type { SafetySeverity } from "@/features/intent/intentParser";
 import { speak, stop as ttsStop } from "@/features/tts/TtsService";
@@ -146,6 +152,8 @@ export default function HomeScreen() {
   const [contactPickerAll, setContactPickerAll] = useState<ContactCandidate[]>([]);
   const [anomalyEnabled, setAnomalyEnabled] = useState(true);
   const [hasAnomalyPermission, setHasAnomalyPermission] = useState(false);
+  const [dailyGreetingEnabled, setDailyGreetingEnabled] = useState(true);
+  const [weeklyStats, setWeeklyStats] = useState<{ callCount: number; topName: string | null } | null>(null);
   const insets = useSafeAreaInsets();
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -161,6 +169,17 @@ export default function HomeScreen() {
     isAnomalyDetectionEnabled().then(setAnomalyEnabled).catch(() => {});
     hasUsagePermission().then(setHasAnomalyPermission).catch(() => {});
     checkAnomalyOnce();
+    // F4-1: 매일 아침 인사 알림 설정 동기화
+    isDailyGreetingEnabled().then(setDailyGreetingEnabled).catch(() => {});
+    // F4-3: 이번 주 통화 통계 로드
+    getRecentLogs(7).then((logs) => {
+      const calls = logs.filter((e) => e.type === "call" && e.outcome === "success");
+      if (calls.length === 0) { setWeeklyStats(null); return; }
+      const freq = new Map<string, number>();
+      for (const c of calls) freq.set(c.targetName, (freq.get(c.targetName) ?? 0) + 1);
+      const topName = [...freq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      setWeeklyStats({ callCount: calls.length, topName });
+    }).catch(() => {});
     // F2-2: SMS 리스너 시작
     startSmsListening();
     const removeSmsListener = addSmsListener(({ sender, body }) => {
@@ -853,6 +872,24 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
 
+            {/* F4-1: 매일 아침 인사 알림 토글 */}
+            <View style={s.anomalyToggleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.anomalyToggleLabel}>매일 아침 인사</Text>
+                <Text style={s.anomalyToggleSub}>오전 10시에 "전화하실 분 있으세요?" 알림</Text>
+              </View>
+              <Switch
+                value={dailyGreetingEnabled}
+                onValueChange={async (v) => {
+                  setDailyGreetingEnabled(v);
+                  if (v) { await scheduleDailyGreeting(); }
+                  else   { await cancelDailyGreeting(); }
+                }}
+                trackColor={{ false: Colors.border, true: Colors.primary }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+
             <TouchableOpacity
               style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.danger }]}
               onPress={() => Alert.alert("연결 해제", "SilverLink 연결을 해제할까요?", [
@@ -914,6 +951,15 @@ export default function HomeScreen() {
                   </View>
                 </View>
               )}
+            {/* F4-3: 주간 요약 카드 */}
+            {weeklyStats && weeklyStats.callCount >= 1 && (
+              <View style={[s.recCard, { backgroundColor: Colors.surface, marginTop: Spacing.xs }]}>
+                <Text style={s.recReason} numberOfLines={1}>
+                  📅 이번 주 {weeklyStats.callCount}번 통화하셨어요
+                  {weeklyStats.topName ? ` · 주로 ${weeklyStats.topName} 님과` : ""}
+                </Text>
+              </View>
+            )}
             </View>
 
             {/* ── 중간: 마이크 (남은 공간 전부 차지, 정중앙) ── */}
