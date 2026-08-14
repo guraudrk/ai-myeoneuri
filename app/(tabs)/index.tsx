@@ -34,7 +34,8 @@ import { createRealPhoneAdapter } from "@/features/calling/RealPhoneAdapter";
 import { createRealLocationAdapter } from "@/features/location/RealLocationAdapter";
 import { createKakaoBusinessSearchAdapter } from "@/features/business/KakaoBusinessSearchAdapter";
 import { createExpoSpeechAdapter } from "@/features/speech/ExpoSpeechAdapter";
-import { parseIntent, askGemini, openAppByName } from "@/features/intent/intentParser";
+import { parseIntent, askGemini, openAppByName, readPaperWithGemini } from "@/features/intent/intentParser";
+import * as ImagePicker from "expo-image-picker";
 import type { SafetySeverity } from "@/features/intent/intentParser";
 import { speak, stop as ttsStop } from "@/features/tts/TtsService";
 import { addLog, getTodayLogs, type LogEntry } from "@/features/conversation-log/ConversationLogService";
@@ -115,7 +116,9 @@ type ScreenState =
   | { type: "app_candidates"; candidates: AppCandidate[]; appFamily: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
   | { type: "relationship_picker"; relationship: string; allContacts: ContactCandidate[]; favoritesMode?: boolean }
-  | { type: "unknown_confirm"; utterance: string };
+  | { type: "unknown_confirm"; utterance: string }
+  | { type: "reading_paper" }
+  | { type: "paper_result"; text: string };
 
 export default function HomeScreen() {
   const [input, setInput]               = useState("");
@@ -257,6 +260,27 @@ export default function HomeScreen() {
         reportSafetyConcernToSilverLink("social_isolation", "medium", "today_usage_anomaly").catch(() => {});
       }
     } catch { /* 이상 감지 실패는 무시 */ }
+  }
+
+  // B-9: 종이 읽어주기 — 카메라로 찍어 Gemini Vision에 전달
+  async function handleReadPaper() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (perm.status !== "granted") {
+      Alert.alert("카메라 권한", "카메라 권한이 필요합니다. 설정에서 허용해 주세요.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: 0.7,
+      base64: true,
+    });
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+    const { base64, mimeType } = result.assets[0];
+    setScreen({ type: "reading_paper" });
+    speak("잠깐 읽어볼게요.").catch(() => {});
+    const text = await readPaperWithGemini(base64!, mimeType ?? "image/jpeg");
+    setScreen({ type: "paper_result", text });
+    speak(text).catch(() => {});
   }
 
   async function handleSearch(utterance?: string) {
@@ -902,6 +926,9 @@ export default function HomeScreen() {
                 <TouchableOpacity style={s.textInputBtn} onPress={() => setShowTextInput(true)}>
                   <Text style={s.textInputBtnText}>⌨️ 직접 입력</Text>
                 </TouchableOpacity>
+                <TouchableOpacity style={s.cameraBtn} onPress={handleReadPaper} accessibilityLabel="종이 읽어주기">
+                  <Text style={s.cameraBtnText}>📷 읽어주기</Text>
+                </TouchableOpacity>
               </View>
               <TouchableOpacity
                 style={s.settingsEntryBtn}
@@ -1258,6 +1285,42 @@ export default function HomeScreen() {
           )}
         </Animated.View>
       )}
+
+      {/* B-9: 종이 읽는 중 */}
+      {screen.type === "reading_paper" && (
+        <View style={s.centerFull}>
+          <View style={s.paperCard}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={s.paperTitle}>읽는 중…</Text>
+            <Text style={s.paperSub}>잠깐 기다려 주세요</Text>
+          </View>
+        </View>
+      )}
+
+      {/* B-9: 종이 읽기 결과 */}
+      {screen.type === "paper_result" && (
+        <View style={[s.centerFull, { paddingHorizontal: Spacing.lg }]}>
+          <View style={s.paperCard}>
+            <Text style={s.paperTitle}>📄 읽어드릴게요</Text>
+            <Text style={s.paperResultText}>{screen.text}</Text>
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button, { marginTop: Spacing.md }]}
+              onPress={() => { speak(screen.text).catch(() => {}); }}
+            >
+              <Text style={s.primaryBtnText}>🔊 다시 읽어주기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.primary, marginTop: Spacing.sm }]}
+              onPress={handleReadPaper}
+            >
+              <Text style={[s.primaryBtnText, { color: Colors.primary }]}>📷 다시 찍기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+              <Text style={s.ghostBtnText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -1532,6 +1595,43 @@ const s = StyleSheet.create({
   anomalyToggleRow: { flexDirection: "row", alignItems: "center", width: "100%", paddingVertical: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.border, marginTop: Spacing.sm },
   anomalyToggleLabel: { fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
   anomalyToggleSub: { fontSize: FontSize.caption, color: Colors.textMuted, marginTop: 2 },
+
+  // B-9 camera button
+  cameraBtn: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minHeight: TouchSize.minimum,
+  },
+  cameraBtnText: { fontSize: FontSize.body, fontWeight: "700", color: Colors.textPrimary },
+
+  // B-9 paper screens
+  paperCard: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    alignItems: "center",
+    gap: Spacing.md,
+    width: "100%",
+  },
+  paperTitle: {
+    fontSize: FontSize.headingLarge,
+    fontWeight: "800",
+    color: Colors.textPrimary,
+    fontFamily: FontFamily.heading,
+    textAlign: "center",
+  },
+  paperSub: { fontSize: FontSize.body, color: Colors.textMuted },
+  paperResultText: {
+    fontSize: FontSize.heading,
+    color: Colors.textPrimary,
+    lineHeight: FontSize.heading * 1.6,
+    textAlign: "center",
+  },
 
   // B-7 unknown_confirm
   unknownCard: {

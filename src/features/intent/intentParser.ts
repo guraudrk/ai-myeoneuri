@@ -267,6 +267,45 @@ export async function askGemini(
   }
 }
 
+/** B-9 종이 읽어주기: base64 이미지를 Gemini Vision에 보내 3줄 이내 요약 반환 */
+export async function readPaperWithGemini(base64: string, mimeType: string = "image/jpeg"): Promise<string> {
+  if (!getGeminiKey()) {
+    __DEV__ && console.warn("[Gemini] API 키가 없습니다.");
+    return "지금 읽기가 어려워요. 잠시 후 다시 시도해 주세요.";
+  }
+  const PROMPT =
+    "이 사진에 있는 글자나 내용을 어르신이 이해하기 쉽게 3줄 이내로 말해 주세요. 전문 용어는 쉬운 말로 바꿔 주세요. 글자가 없으면 \"글자가 보이지 않아요\"라고 말해 주세요.";
+  try {
+    const res = await geminiPost({
+      body: {
+        system_instruction: { parts: [{ text: ELDERLY_SYSTEM_PROMPT }] },
+        contents: [
+          {
+            parts: [
+              { text: PROMPT },
+              { inline_data: { mime_type: mimeType, data: base64 } },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 200 },
+      },
+      timeoutMs: 30_000,
+    });
+    if (!res.ok) {
+      __DEV__ && console.warn(`[Gemini] readPaperWithGemini HTTP ${res.status}`);
+      return "지금 읽기가 어려워요. 잠시 후 다시 시도해 주세요.";
+    }
+    const data = await res.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const parts = data.candidates?.[0]?.content?.parts ?? [];
+    return parts.map((p) => p.text ?? "").join("").trim() || "내용을 읽지 못했어요.";
+  } catch (e) {
+    __DEV__ && console.warn("[Gemini] readPaperWithGemini 실패", e);
+    return "인터넷 연결을 확인해 주세요.";
+  }
+}
+
 // ─── 인텐트 분류 ─────────────────────────────────────────────────────────────
 /** L3 Gemini Flash 전용 분류기 (내부 사용) */
 async function parseIntentL3(

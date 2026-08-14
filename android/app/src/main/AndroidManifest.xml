@@ -4,6 +4,8 @@
   <!-- B-8 조용한 이상 감지: 온디바이스 폰 사용 패턴 학습. 원본 로그 서버 미전송 -->
   <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
     tools:ignore="ProtectedPermissions"/>
+  <!-- B-9 종이 읽어주기: 사진 촬영 후 Gemini 멀티모달 OCR -->
+  <uses-permission android:name="android.permission.CAMERA"/>
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.READ_CONTACTS"/>
