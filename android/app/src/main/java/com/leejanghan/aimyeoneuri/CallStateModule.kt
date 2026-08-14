@@ -18,6 +18,7 @@ class CallStateModule(private val reactContext: ReactApplicationContext) :
     override fun getName(): String = "CallState"
 
     private var receiver: BroadcastReceiver? = null
+    private var wasOffhook = false
 
     @ReactMethod
     fun startListening() {
@@ -25,14 +26,22 @@ class CallStateModule(private val reactContext: ReactApplicationContext) :
         receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE) ?: return
-                if (state != TelephonyManager.EXTRA_STATE_RINGING) return
-                val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER) ?: ""
-                val params = Arguments.createMap().apply {
-                    putString("number", number)
-                }
-                reactContext
+                val emitter = reactContext
                     .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                    .emit("IncomingCall", params)
+                when (state) {
+                    TelephonyManager.EXTRA_STATE_RINGING -> {
+                        val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER) ?: ""
+                        emitter.emit("IncomingCall", Arguments.createMap().apply { putString("number", number) })
+                    }
+                    TelephonyManager.EXTRA_STATE_OFFHOOK -> {
+                        wasOffhook = true
+                        emitter.emit("CallActive", Arguments.createMap())
+                    }
+                    TelephonyManager.EXTRA_STATE_IDLE -> {
+                        if (wasOffhook) emitter.emit("CallEnded", Arguments.createMap())
+                        wasOffhook = false
+                    }
+                }
             }
         }
         val filter = IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED)

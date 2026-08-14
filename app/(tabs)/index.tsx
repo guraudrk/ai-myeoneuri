@@ -15,6 +15,7 @@ import {
   Animated,
   Dimensions,
   Switch,
+  Vibration,
 } from "react-native";
 
 const { height: screenHeight } = Dimensions.get("window");
@@ -38,7 +39,8 @@ import { parseIntent, askGemini, openAppByName, readPaperWithGemini } from "@/fe
 import * as ImagePicker from "expo-image-picker";
 import { detectSmishing } from "@/features/safety/smishingRules";
 import { startSmsListening, stopSmsListening, addSmsListener } from "@/features/safety/SmsReceiverAdapter";
-import { startCallStateListening, stopCallStateListening, addIncomingCallListener } from "@/features/safety/CallStateAdapter";
+import { startCallStateListening, stopCallStateListening, addIncomingCallListener, addCallActiveListener, addCallEndedListener } from "@/features/safety/CallStateAdapter";
+import { startKeywordListening, stopKeywordListening, addKeywordListener } from "@/features/safety/CallKeywordAdapter";
 import { isNumberInContacts } from "@/features/safety/ContactNumberChecker";
 import type { SafetySeverity } from "@/features/intent/intentParser";
 import { speak, stop as ttsStop } from "@/features/tts/TtsService";
@@ -124,7 +126,8 @@ type ScreenState =
   | { type: "reading_paper" }
   | { type: "paper_result"; text: string }
   | { type: "smishing_alert"; sender: string; body: string; risk: "high" | "medium" }
-  | { type: "unknown_call"; number: string };
+  | { type: "unknown_call"; number: string }
+  | { type: "call_keyword_warning"; keyword: string };
 
 export default function HomeScreen() {
   const [input, setInput]               = useState("");
@@ -178,10 +181,30 @@ export default function HomeScreen() {
         }
       }).catch(() => {});
     });
+    // F2-3: 통화 중 키워드 감지
+    const removeCallActiveListener = addCallActiveListener(() => {
+      setScreen((prev) => (prev.type === "unknown_call" ? { type: "idle" } : prev));
+      startKeywordListening();
+    });
+    const removeCallEndedListener = addCallEndedListener(() => {
+      stopKeywordListening();
+      setScreen((prev) => (prev.type === "call_keyword_warning" ? { type: "idle" } : prev));
+    });
+    const removeKeywordListener = addKeywordListener(({ keyword }) => {
+      setScreen({ type: "call_keyword_warning", keyword });
+      Vibration.vibrate([200, 100, 200]);
+      speak("주의하세요. 보이스피싱일 수 있어요.").catch(() => {});
+    });
     AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
       .then(() => AnalyticsService.flush())
       .catch(() => {});
-    return () => { ttsStop(); stopSmsListening(); removeSmsListener(); stopCallStateListening(); removeCallListener(); };
+    return () => {
+      ttsStop();
+      stopSmsListening(); removeSmsListener();
+      stopCallStateListening(); removeCallListener();
+      stopKeywordListening();
+      removeCallActiveListener(); removeCallEndedListener(); removeKeywordListener();
+    };
   }, []);
 
   // 탭 전환 후 돌아올 때 즐겨찾기 갱신
@@ -1361,6 +1384,28 @@ export default function HomeScreen() {
               onPress={handleReset}
             >
               <Text style={s.primaryBtnText}>확인했어요</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* F2-3: 통화 중 위험 키워드 경보 */}
+      {screen.type === "call_keyword_warning" && (
+        <View style={[s.centerFull, { paddingHorizontal: Spacing.lg }]}>
+          <View style={[s.paperCard, { borderWidth: 3, borderColor: Colors.danger }]}>
+            <Text style={s.smishingIcon}>🚨</Text>
+            <Text style={s.smishingTitle}>통화 중 주의!</Text>
+            <Text style={[s.smishingSender, { color: Colors.danger, fontFamily: FontFamily.heading }]}>
+              "{screen.keyword}" 발화 감지됨
+            </Text>
+            <Text style={s.smishingAdvice}>
+              계좌번호·인증번호·송금을 요구받고 있다면{"\n"}지금 바로 전화를 끊으세요.
+            </Text>
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.danger }]}
+              onPress={handleReset}
+            >
+              <Text style={s.primaryBtnText}>계속 지켜볼게요</Text>
             </TouchableOpacity>
           </View>
         </View>

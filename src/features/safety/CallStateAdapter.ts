@@ -29,3 +29,17 @@ export function addIncomingCallListener(handler: (event: IncomingCallEvent) => v
   const sub = emitter.addListener("IncomingCall", handler);
   return () => sub.remove();
 }
+
+export function addCallActiveListener(handler: () => void): () => void {
+  if (!isSupported()) return () => {};
+  if (!emitter) emitter = new NativeEventEmitter(CallState);
+  const sub = emitter.addListener("CallActive", handler);
+  return () => sub.remove();
+}
+
+export function addCallEndedListener(handler: () => void): () => void {
+  if (!isSupported()) return () => {};
+  if (!emitter) emitter = new NativeEventEmitter(CallState);
+  const sub = emitter.addListener("CallEnded", handler);
+  return () => sub.remove();
+}

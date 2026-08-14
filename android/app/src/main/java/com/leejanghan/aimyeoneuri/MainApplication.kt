@@ -28,6 +28,7 @@ class MainApplication : Application(), ReactApplication {
               add(UsageStatsPackage())
               add(SmsListenerPackage())
               add(CallStatePackage())
+              add(CallKeywordPackage())
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
