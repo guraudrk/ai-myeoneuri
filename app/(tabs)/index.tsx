@@ -45,6 +45,7 @@ import {
   type FavoriteContact,
 } from "@/features/favorites/FavoritesAdapter";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AnalyticsService } from "@/features/analytics/AnalyticsService";
 import { getLinkData, clearLink, type LinkData } from "@/features/supabase/linkService";
 import { OnboardingScreen } from "@/features/onboarding/OnboardingScreen";
 import { useFocusEffect } from "expo-router";
@@ -126,6 +127,9 @@ export default function HomeScreen() {
     getLinkData().then(setLinkData).catch(() => {});
     runDailyGreeting();
     loadRecommendation();
+    AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
+      .then(() => AnalyticsService.flush())
+      .catch(() => {});
     return () => { ttsStop(); };
   }, []);
 
@@ -200,6 +204,9 @@ export default function HomeScreen() {
     setInput("");
     setMicError(false);
 
+    const inputMethod = utterance !== undefined ? "voice" : "text";
+    AnalyticsService.track("utterance_recognized", { attempt: 1, input_method: inputMethod }).catch(() => {});
+
     // 키워드로 초기 메시지를 미리 추정
     const initialMsg =
       /전화|연락|통화/.test(query) ? "연락처 찾는 중…" :
@@ -213,6 +220,10 @@ export default function HomeScreen() {
     const parsed = await parseIntent(query, {
       onRetry: () => setSearchingMsg("조금만 기다려 주세요…"),
     });
+    AnalyticsService.track("intent_parsed", {
+      intent: parsed.intent,
+      resolved_by: parsed.resolved_by ?? "L3",
+    }).catch(() => {});
 
     // 인텐트 확정 후 메시지 업데이트
     const intentMsg: Partial<Record<string, string>> = {
@@ -439,11 +450,13 @@ export default function HomeScreen() {
     if (isListening) { await speechAdapter.stopListening(); setIsListening(false); return; }
     setMicError(false);
     setIsListening(true);
+    AnalyticsService.track("utterance_started", { input_method: "voice" }).catch(() => {});
     await speechAdapter.startListening(
       (text) => { setIsListening(false); handleSearch(text); },
       (err)  => {
         setIsListening(false);
         setMicError(true);
+        AnalyticsService.track("utterance_failed", { attempt: 1, error_code: err, input_method: "voice" }).catch(() => {});
         // 에러 표시 후 3초 뒤 idle 복구
         setTimeout(() => setMicError(false), 3000);
         Alert.alert("음성 인식 오류", err);

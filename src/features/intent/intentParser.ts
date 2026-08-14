@@ -41,20 +41,22 @@ export function safetyseverity(cat: SafetyCategory): SafetySeverity {
   return CATEGORY_SEVERITY[cat] ?? "medium";
 }
 
+export type ResolvedBy = "L0" | "L1" | "L2" | "L3";
+
 export type ParsedIntent =
-  | { intent: "call_contact"; contactName: string }
-  | { intent: "search_business"; query: string }
-  | { intent: "set_reminder"; medicineName: string; timeHHMM: string }
-  | { intent: "general_question"; utterance: string }
-  | { intent: "safety_concern"; category: SafetyCategory; severity: SafetySeverity; utterance: string }
-  | { intent: "open_app"; appName: string; packageName: string }
-  | { intent: "add_to_favorites"; contactName: string }
-  | { intent: "date_time" }
-  | { intent: "conversation_summary" }
-  | { intent: "emergency_family" }
-  | { intent: "calm_down" }
-  | { intent: "sos" }
-  | { intent: "unknown" };
+  | { intent: "call_contact"; contactName: string; resolved_by?: ResolvedBy }
+  | { intent: "search_business"; query: string; resolved_by?: ResolvedBy }
+  | { intent: "set_reminder"; medicineName: string; timeHHMM: string; resolved_by?: ResolvedBy }
+  | { intent: "general_question"; utterance: string; resolved_by?: ResolvedBy }
+  | { intent: "safety_concern"; category: SafetyCategory; severity: SafetySeverity; utterance: string; resolved_by?: ResolvedBy }
+  | { intent: "open_app"; appName: string; packageName: string; resolved_by?: ResolvedBy }
+  | { intent: "add_to_favorites"; contactName: string; resolved_by?: ResolvedBy }
+  | { intent: "date_time"; resolved_by?: ResolvedBy }
+  | { intent: "conversation_summary"; resolved_by?: ResolvedBy }
+  | { intent: "emergency_family"; resolved_by?: ResolvedBy }
+  | { intent: "calm_down"; resolved_by?: ResolvedBy }
+  | { intent: "sos"; resolved_by?: ResolvedBy }
+  | { intent: "unknown"; resolved_by?: ResolvedBy };
 
 // ─── 설치 앱 조회 (PackageManager 방식) ─────────────────────────────────────
 export type RawApp = { packageName: string; label: string };
