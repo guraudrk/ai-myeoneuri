@@ -58,3 +58,21 @@ export async function saveToL1Cache(utterance: string, intent: ParsedIntent): Pr
   cache[key] = { intent, savedAt: new Date().toISOString() };
   await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(cache));
 }
+
+// B-7: 사용자가 직접 정정한 인텐트를 L1에 강제 저장 (unknown 체크 없음)
+export async function correctL1Cache(utterance: string, intent: ParsedIntent): Promise<void> {
+  const key = normalizeKey(utterance);
+  const cache = await loadCache();
+  const entries = Object.entries(cache);
+  if (entries.length >= MAX_ENTRIES) {
+    entries.sort((a, b) =>
+      new Date(a[1].savedAt).getTime() - new Date(b[1].savedAt).getTime()
+    );
+    const trimmed = Object.fromEntries(entries.slice(entries.length - MAX_ENTRIES + 1));
+    trimmed[key] = { intent, savedAt: new Date().toISOString() };
+    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(trimmed));
+    return;
+  }
+  cache[key] = { intent, savedAt: new Date().toISOString() };
+  await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+}

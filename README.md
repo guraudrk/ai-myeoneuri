@@ -46,6 +46,7 @@ Do not overwrite them.
 
 ## 개발일지
 
+- [2026-08-14 개발일지](docs/work-log/2026-08-14.md)
 - [2026-08-10 개발일지](docs/work-log/2026-08-10.md)
 - [2026-08-07 개발일지](docs/work-log/2026-08-07.md)
 - [2026-08-06 개발일지](docs/work-log/2026-08-06.md)

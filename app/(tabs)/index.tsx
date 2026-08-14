@@ -19,7 +19,8 @@ import {
 const { height: screenHeight } = Dimensions.get("window");
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, FontFamily, FontSize, TouchSize, Spacing, Shadow, Radius } from "@/components/tokens";
-import type { AppCandidate } from "@/features/intent/intentParser";
+import type { AppCandidate, ParsedIntent } from "@/features/intent/intentParser";
+import { correctL1Cache } from "@/features/intent/intentL1Cache";
 import { LargeMicrophoneButton, type MicState } from "@/components/LargeMicrophoneButton";
 import { ContactCandidateCard } from "@/components/ContactCandidateCard";
 import { ConfirmationPanel } from "@/components/ConfirmationPanel";
@@ -99,7 +100,8 @@ type ScreenState =
   | { type: "safety_alert"; category: string; severity: SafetySeverity; utterance: string }
   | { type: "app_candidates"; candidates: AppCandidate[]; appFamily: string }
   | { type: "permission_denied"; reason: "contacts" | "location" }
-  | { type: "relationship_picker"; relationship: string; allContacts: ContactCandidate[]; favoritesMode?: boolean };
+  | { type: "relationship_picker"; relationship: string; allContacts: ContactCandidate[]; favoritesMode?: boolean }
+  | { type: "unknown_confirm"; utterance: string };
 
 export default function HomeScreen() {
   const [input, setInput]               = useState("");
@@ -430,6 +432,12 @@ export default function HomeScreen() {
       return;
     }
 
+    // B-7: unknown 인텐트 → 확인 질문 화면 (Alert "다시 말씀해 주세요" 경로 제거)
+    if (parsed.intent === "unknown") {
+      setScreen({ type: "unknown_confirm", utterance: query });
+      return;
+    }
+
     const result = await searchContacts(query, contactsAdapter);
     if (result.status === "permission_denied") {
       setScreen({ type: "permission_denied", reason: "contacts" });
@@ -571,6 +579,49 @@ export default function HomeScreen() {
   async function handleRecSnooze(recommendation: Recommendation) {
     await snoozeRecommendation(recommendation.contactId);
     setRec(null);
+  }
+
+  // B-7: unknown_confirm → 전화 선택
+  async function handleUnknownCallIntent(utterance: string) {
+    const intent: ParsedIntent = { intent: "call_contact", contactName: utterance };
+    await correctL1Cache(utterance, intent);
+    speak("연락처를 찾아볼게요.").catch(() => {});
+    setScreen({ type: "searching" });
+    setSearchingMsg("연락처 찾는 중…");
+    const result = await searchContacts(utterance, contactsAdapter);
+    if (result.status === "permission_denied") {
+      setScreen({ type: "permission_denied", reason: "contacts" });
+    } else if (result.status === "unmapped_relationship") {
+      const all = await contactsAdapter.searchContacts("");
+      setScreen({ type: "relationship_picker", relationship: result.relationship, allContacts: all });
+    } else if (result.status === "no_results") {
+      setScreen({ type: "idle" });
+      Alert.alert("", "연락처를 찾지 못했어요. 즐겨찾기에서 골라 주세요.");
+    } else {
+      const allC = await contactsAdapter.searchContacts("");
+      setContactPickerAll(allC);
+      setScreen({ type: "contact_candidates", candidates: result.candidates, requestId: nextRequestId() });
+    }
+  }
+
+  // B-7: unknown_confirm → 검색 선택
+  async function handleUnknownSearchIntent(utterance: string) {
+    const intent: ParsedIntent = { intent: "search_business", query: utterance };
+    await correctL1Cache(utterance, intent);
+    setScreen({ type: "searching" });
+    setSearchingMsg("주변 검색 중…");
+    const result = await searchBusinesses(utterance, locationAdapter, businessAdapter);
+    if (result.status === "location_denied") {
+      setScreen({ type: "permission_denied", reason: "location" });
+    } else if (result.status === "search_error") {
+      setScreen({ type: "idle" });
+      Alert.alert("검색 오류", result.reason);
+    } else if (result.status === "no_results") {
+      setScreen({ type: "idle" });
+      Alert.alert("", "주변 결과를 찾지 못했어요.");
+    } else {
+      setScreen({ type: "business_candidates", candidates: result.candidates, requestId: nextRequestId(), query: utterance });
+    }
   }
 
   function handleReset() {
@@ -1066,6 +1117,57 @@ export default function HomeScreen() {
           </View>
         </View>
       )}
+
+      {/* ══════ B-7 인식 실패 확인 ══════ */}
+      {screen.type === "unknown_confirm" && (
+        <Animated.View style={[s.centerFull, { opacity: fadeAnim, paddingHorizontal: Spacing.lg }]}>
+          <View style={s.unknownCard}>
+            <Text style={s.unknownTitle}>잘 못 들었어요</Text>
+            <Text style={s.unknownUtterance}>"{screen.utterance}"</Text>
+            <Text style={s.unknownSubtitle}>어떻게 도와드릴까요?</Text>
+
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button]}
+              onPress={() => handleUnknownCallIntent(screen.utterance)}
+            >
+              <Text style={s.primaryBtnText}>📞 전화할게요</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button, s.unknownSecondBtn]}
+              onPress={() => handleUnknownSearchIntent(screen.utterance)}
+            >
+              <Text style={[s.primaryBtnText, { color: Colors.textPrimary }]}>🔍 주변 검색할게요</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+              <Text style={s.ghostBtnText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+
+          {favorites.length > 0 && (
+            <View style={s.unknownFavSection}>
+              <Text style={s.sectionLabel}>즐겨찾기에서 바로 전화</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.favScroll}>
+                {favorites.map((fav) => (
+                  <TouchableOpacity
+                    key={fav.id}
+                    style={s.favCard}
+                    onPress={() => { handleFavoriteDial(fav); }}
+                    accessibilityLabel={`${fav.name} 전화`}
+                  >
+                    <View style={s.favAvatar}>
+                      <Text style={s.favInitial}>{initial(fav.name)}</Text>
+                    </View>
+                    <Text style={s.favName} numberOfLines={1}>{fav.name}</Text>
+                    <Text style={s.favCallLabel}>📞 전화</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -1335,4 +1437,42 @@ const s = StyleSheet.create({
   linkedStateBox: { backgroundColor: Colors.primaryTint, borderRadius: Radius.md, padding: Spacing.md, alignItems: "center", gap: 4 },
   linkedStateLabel: { fontSize: FontSize.caption, color: Colors.primary, fontWeight: "600" },
   linkedStateName:  { fontSize: FontSize.heading, fontWeight: "800", color: Colors.textPrimary, fontFamily: FontFamily.heading },
+
+  // B-7 unknown_confirm
+  unknownCard: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    alignItems: "center",
+    gap: Spacing.md,
+    width: "100%",
+  },
+  unknownTitle: {
+    fontSize: FontSize.headingLarge,
+    fontWeight: "800",
+    color: Colors.textPrimary,
+    fontFamily: FontFamily.heading,
+    textAlign: "center",
+  },
+  unknownUtterance: {
+    fontSize: FontSize.body,
+    color: Colors.textMuted,
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+  unknownSubtitle: {
+    fontSize: FontSize.body,
+    color: Colors.textSecondary,
+    textAlign: "center",
+  },
+  unknownSecondBtn: {
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  unknownFavSection: {
+    width: "100%",
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+  },
 });
