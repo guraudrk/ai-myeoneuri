@@ -38,6 +38,8 @@ import { parseIntent, askGemini, openAppByName, readPaperWithGemini } from "@/fe
 import * as ImagePicker from "expo-image-picker";
 import { detectSmishing } from "@/features/safety/smishingRules";
 import { startSmsListening, stopSmsListening, addSmsListener } from "@/features/safety/SmsReceiverAdapter";
+import { startCallStateListening, stopCallStateListening, addIncomingCallListener } from "@/features/safety/CallStateAdapter";
+import { isNumberInContacts } from "@/features/safety/ContactNumberChecker";
 import type { SafetySeverity } from "@/features/intent/intentParser";
 import { speak, stop as ttsStop } from "@/features/tts/TtsService";
 import { addLog, getTodayLogs, type LogEntry } from "@/features/conversation-log/ConversationLogService";
@@ -121,7 +123,8 @@ type ScreenState =
   | { type: "unknown_confirm"; utterance: string }
   | { type: "reading_paper" }
   | { type: "paper_result"; text: string }
-  | { type: "smishing_alert"; sender: string; body: string; risk: "high" | "medium" };
+  | { type: "smishing_alert"; sender: string; body: string; risk: "high" | "medium" }
+  | { type: "unknown_call"; number: string };
 
 export default function HomeScreen() {
   const [input, setInput]               = useState("");
@@ -164,10 +167,21 @@ export default function HomeScreen() {
         speak("위험한 문자가 왔어요. 주의하세요.").catch(() => {});
       }
     });
+    // F2-1: 수신 전화 리스너 시작
+    startCallStateListening();
+    const removeCallListener = addIncomingCallListener(({ number }) => {
+      if (!number) return;
+      isNumberInContacts(number).then((inContacts) => {
+        if (!inContacts) {
+          setScreen({ type: "unknown_call", number });
+          speak("저장되지 않은 번호예요. 주의하세요.").catch(() => {});
+        }
+      }).catch(() => {});
+    });
     AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
       .then(() => AnalyticsService.flush())
       .catch(() => {});
-    return () => { ttsStop(); stopSmsListening(); removeSmsListener(); };
+    return () => { ttsStop(); stopSmsListening(); removeSmsListener(); stopCallStateListening(); removeCallListener(); };
   }, []);
 
   // 탭 전환 후 돌아올 때 즐겨찾기 갱신
@@ -1329,6 +1343,24 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
               <Text style={s.ghostBtnText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* F2-1: 모르는 번호 경고 */}
+      {screen.type === "unknown_call" && (
+        <View style={[s.centerFull, { paddingHorizontal: Spacing.lg }]}>
+          <View style={[s.paperCard, { borderWidth: 2, borderColor: Colors.warning }]}>
+            <Text style={s.smishingIcon}>📞</Text>
+            <Text style={[s.smishingTitle, { color: Colors.warning }]}>저장되지 않은 번호예요</Text>
+            <Text style={s.smishingSender}>{screen.number || "번호 없음"}</Text>
+            <Text style={s.smishingAdvice}>가족이 아닐 수 있어요. 조심하세요.</Text>
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button]}
+              onPress={handleReset}
+            >
+              <Text style={s.primaryBtnText}>확인했어요</Text>
             </TouchableOpacity>
           </View>
         </View>
