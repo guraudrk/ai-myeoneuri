@@ -1,6 +1,9 @@
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { Colors } from "@/components/tokens";
+import { RevenueCatService } from "@/features/billing/RevenueCatService";
+
+RevenueCatService.configure();
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
