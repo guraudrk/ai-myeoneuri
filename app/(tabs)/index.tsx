@@ -14,6 +14,7 @@ import {
   StatusBar,
   Animated,
   Dimensions,
+  Switch,
 } from "react-native";
 
 const { height: screenHeight } = Dimensions.get("window");
@@ -48,6 +49,19 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AnalyticsService } from "@/features/analytics/AnalyticsService";
 import { getLinkData, clearLink, type LinkData } from "@/features/supabase/linkService";
+import {
+  isAnomalyDetectionEnabled,
+  setAnomalyDetectionEnabled,
+  recordDailyUsage,
+  detectAnomaly,
+  isAnomalyDismissed,
+  markAnomalyDismissed,
+} from "@/features/anomaly/BaselineService";
+import {
+  getDailyUsage,
+  hasUsagePermission,
+  requestUsagePermission,
+} from "@/features/anomaly/UsageStatsAdapter";
 import { OnboardingScreen } from "@/features/onboarding/OnboardingScreen";
 import { useFocusEffect } from "expo-router";
 import type { ContactCandidate } from "@/domain/types";
@@ -118,6 +132,8 @@ export default function HomeScreen() {
   const [relSearch, setRelSearch] = useState("");
   const [contactPickerSearch, setContactPickerSearch] = useState("");
   const [contactPickerAll, setContactPickerAll] = useState<ContactCandidate[]>([]);
+  const [anomalyEnabled, setAnomalyEnabled] = useState(true);
+  const [hasAnomalyPermission, setHasAnomalyPermission] = useState(false);
   const insets = useSafeAreaInsets();
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -129,6 +145,10 @@ export default function HomeScreen() {
     getLinkData().then(setLinkData).catch(() => {});
     runDailyGreeting();
     loadRecommendation();
+    // B-8: 이상 감지 초기화
+    isAnomalyDetectionEnabled().then(setAnomalyEnabled).catch(() => {});
+    hasUsagePermission().then(setHasAnomalyPermission).catch(() => {});
+    checkAnomalyOnce();
     AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
       .then(() => AnalyticsService.flush())
       .catch(() => {});
@@ -197,6 +217,46 @@ export default function HomeScreen() {
       const greeting = `안녕하세요. 오늘은 ${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일이에요.`;
       setTimeout(() => speak(greeting).catch(() => {}), 1200);
     } catch { /* 무시 */ }
+  }
+
+  // B-8: 조용한 이상 감지 — 앱 시작 시 1회
+  async function checkAnomalyOnce() {
+    try {
+      const enabled = await isAnomalyDetectionEnabled();
+      if (!enabled) return;
+      const perm = await hasUsagePermission();
+      if (!perm) return;
+
+      const raw = await getDailyUsage();
+      if (!raw) return;
+
+      const today = new Date().toISOString().slice(0, 10);
+      const dismissed = await isAnomalyDismissed(today);
+      if (dismissed) return;
+
+      const firstHour = raw.firstUsageTime >= 0
+        ? new Date(raw.firstUsageTime).getHours()
+        : null;
+      const sample = {
+        date: today,
+        firstUsageHour: firstHour,
+        totalForegroundMin: Math.round(raw.totalForegroundMs / 60000),
+      };
+
+      await recordDailyUsage(sample);
+      const level = await detectAnomaly(sample);
+
+      if (level === "none") return;
+
+      // 1단계: 어르신에게 조용히 음성으로 확인
+      const msg = "오늘은 좀 늦으셨네요. 괜찮으세요?";
+      setTimeout(() => speak(msg).catch(() => {}), 3000);
+
+      // 2단계(significant): 자녀 알림 (원본 사용 로그 없이)
+      if (level === "significant") {
+        reportSafetyConcernToSilverLink("social_isolation", "medium", "today_usage_anomaly").catch(() => {});
+      }
+    } catch { /* 이상 감지 실패는 무시 */ }
   }
 
   async function handleSearch(utterance?: string) {
@@ -690,6 +750,36 @@ export default function HomeScreen() {
               <Text style={s.linkedStateLabel}>현재 연결된 어르신</Text>
               <Text style={s.linkedStateName}>{(linkData as { linked: true; elderName: string }).elderName}</Text>
             </View>
+
+            {/* B-8 이상 감지 토글 */}
+            <View style={s.anomalyToggleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.anomalyToggleLabel}>조용한 이상 감지</Text>
+                <Text style={s.anomalyToggleSub}>평소와 달라지면 가족에게 알려드려요</Text>
+              </View>
+              <Switch
+                value={anomalyEnabled}
+                onValueChange={async (v) => {
+                  await setAnomalyDetectionEnabled(v);
+                  setAnomalyEnabled(v);
+                }}
+                trackColor={{ false: Colors.border, true: Colors.primary }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+            {anomalyEnabled && !hasAnomalyPermission && (
+              <TouchableOpacity
+                style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.primary }]}
+                onPress={async () => {
+                  await requestUsagePermission();
+                  const perm = await hasUsagePermission();
+                  setHasAnomalyPermission(perm);
+                }}
+              >
+                <Text style={[s.primaryBtnText, { color: Colors.primary }]}>📱 사용 통계 권한 허용</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.danger }]}
               onPress={() => Alert.alert("연결 해제", "SilverLink 연결을 해제할까요?", [
@@ -1437,6 +1527,11 @@ const s = StyleSheet.create({
   linkedStateBox: { backgroundColor: Colors.primaryTint, borderRadius: Radius.md, padding: Spacing.md, alignItems: "center", gap: 4 },
   linkedStateLabel: { fontSize: FontSize.caption, color: Colors.primary, fontWeight: "600" },
   linkedStateName:  { fontSize: FontSize.heading, fontWeight: "800", color: Colors.textPrimary, fontFamily: FontFamily.heading },
+
+  // B-8 anomaly toggle
+  anomalyToggleRow: { flexDirection: "row", alignItems: "center", width: "100%", paddingVertical: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.border, marginTop: Spacing.sm },
+  anomalyToggleLabel: { fontSize: FontSize.body, fontWeight: "600", color: Colors.textPrimary },
+  anomalyToggleSub: { fontSize: FontSize.caption, color: Colors.textMuted, marginTop: 2 },
 
   // B-7 unknown_confirm
   unknownCard: {
