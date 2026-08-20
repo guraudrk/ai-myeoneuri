@@ -331,7 +331,7 @@ AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
     speak("잠깐 읽어볼게요.").catch(() => {});
     const text = await readPaperWithGemini(base64!, mimeType ?? "image/jpeg");
     setScreen({ type: "paper_result", text });
-    speak(text, { maxSentences: 50 }).catch(() => {});
+    speak(text, { maxSentences: Infinity }).catch(() => {});
   }
 
   async function handleSearch(utterance?: string) {
@@ -1420,7 +1420,7 @@ AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
           <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, gap: Spacing.sm }}>
             <TouchableOpacity
               style={[s.primaryBtn, Shadow.button]}
-              onPress={() => { speak(screen.text, { maxSentences: 50 }).catch(() => {}); }}
+              onPress={() => { speak(screen.text, { maxSentences: Infinity }).catch(() => {}); }}
             >
               <Text style={s.primaryBtnText}>🔊 다시 읽어주기</Text>
             </TouchableOpacity>
