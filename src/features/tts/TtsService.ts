@@ -46,7 +46,7 @@ async function getBestKoreanVoice(): Promise<string | undefined> {
  * - 마크다운 제거
  * - 문장 수 제한 (최대 4문장)
  */
-export function prepareForSpeech(raw: string): string {
+export function prepareForSpeech(raw: string, maxSentences = 4): string {
   let t = raw
     // 마크다운 제거
     .replace(/\*\*(.+?)\*\*/g, "$1")
@@ -74,17 +74,16 @@ export function prepareForSpeech(raw: string): string {
     .replace(/\s{2,}/g, " ")
     .trim();
 
-  // 문장 4개 초과 시 잘라냄 (어르신이 집중할 수 있는 최대치)
   const sentences = t.match(/[^.!?]+[.!?]+/g) ?? [t];
-  if (sentences.length > 4) {
-    t = sentences.slice(0, 4).join(" ").trim();
+  if (sentences.length > maxSentences) {
+    t = sentences.slice(0, maxSentences).join(" ").trim();
   }
 
   return t;
 }
 
-export async function speak(text: string): Promise<void> {
-  const prepared = prepareForSpeech(text);
+export async function speak(text: string, opts?: { maxSentences?: number }): Promise<void> {
+  const prepared = prepareForSpeech(text, opts?.maxSentences ?? 4);
   const voiceId = await getBestKoreanVoice();
   await Speech.stop();
   _isSpeaking = true;

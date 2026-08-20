@@ -331,7 +331,7 @@ AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
     speak("잠깐 읽어볼게요.").catch(() => {});
     const text = await readPaperWithGemini(base64!, mimeType ?? "image/jpeg");
     setScreen({ type: "paper_result", text });
-    speak(text).catch(() => {});
+    speak(text, { maxSentences: 10 }).catch(() => {});
   }
 
   async function handleSearch(utterance?: string) {
@@ -1382,27 +1382,29 @@ AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
 
       {/* B-9: 종이 읽기 결과 */}
       {screen.type === "paper_result" && (
-        <View style={[s.centerFull, { paddingHorizontal: Spacing.lg }]}>
-          <View style={s.paperCard}>
-            <Text style={s.paperTitle}>📄 읽어드릴게요</Text>
-            <Text style={s.paperResultText}>{screen.text}</Text>
-            <TouchableOpacity
-              style={[s.primaryBtn, Shadow.button, { marginTop: Spacing.md }]}
-              onPress={() => { speak(screen.text).catch(() => {}); }}
-            >
-              <Text style={s.primaryBtnText}>🔊 다시 읽어주기</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.primary, marginTop: Spacing.sm }]}
-              onPress={handleReadPaper}
-            >
-              <Text style={[s.primaryBtnText, { color: Colors.primary }]}>📷 다시 찍기</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
-              <Text style={s.ghostBtnText}>닫기</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ScrollView
+          style={{ flex: 1, backgroundColor: Colors.surface }}
+          contentContainerStyle={{ padding: Spacing.lg, paddingBottom: Spacing.xl * 2 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={s.paperTitle}>📄 읽어드릴게요</Text>
+          <Text style={[s.paperResultText, { textAlign: "left", marginTop: Spacing.md }]}>{screen.text}</Text>
+          <TouchableOpacity
+            style={[s.primaryBtn, Shadow.button, { marginTop: Spacing.xl }]}
+            onPress={() => { speak(screen.text, { maxSentences: 10 }).catch(() => {}); }}
+          >
+            <Text style={s.primaryBtnText}>🔊 다시 읽어주기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.primary, marginTop: Spacing.sm }]}
+            onPress={handleReadPaper}
+          >
+            <Text style={[s.primaryBtnText, { color: Colors.primary }]}>📷 다시 찍기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
+            <Text style={s.ghostBtnText}>닫기</Text>
+          </TouchableOpacity>
+        </ScrollView>
       )}
 
       {/* F2-1: 모르는 번호 경고 */}
