@@ -2,6 +2,7 @@ import { NativeModules, AppState } from "react-native";
 import { resolvePackageName } from "./appPackages";
 import { tryL0 } from "./intentL0";
 import { getFromL1Cache, saveToL1Cache } from "./intentL1Cache";
+import { AnalyticsService } from "@/features/analytics/AnalyticsService";
 
 function getGeminiKey() { return process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? ""; }
 function getGeminiUrl() { return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${getGeminiKey()}`; }
@@ -257,9 +258,18 @@ export async function askGemini(
     }
     const data = await res.json() as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
     };
     const parts = data.candidates?.[0]?.content?.parts ?? [];
-    return parts.map((p) => p.text ?? "").join("").trim() || "지금 답변이 어려워요. 잠시 후 다시 말씀해 주세요.";
+    const answer = parts.map((p) => p.text ?? "").join("").trim() || "지금 답변이 어려워요. 잠시 후 다시 말씀해 주세요.";
+    if (data.usageMetadata) {
+      AnalyticsService.track("ai_cost_incurred", {
+        model: "gemini-2.5-flash",
+        input_tokens: data.usageMetadata.promptTokenCount ?? 0,
+        output_tokens: data.usageMetadata.candidatesTokenCount ?? 0,
+      }).catch(() => {});
+    }
+    return answer;
   } catch (e) {
     __DEV__ && console.warn("[Gemini] askGemini 최종 실패", e);
     const isNetwork = e instanceof TypeError || (e instanceof Error && e.name === "AbortError");
@@ -297,9 +307,18 @@ export async function readPaperWithGemini(base64: string, mimeType: string = "im
     }
     const data = await res.json() as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
     };
     const parts = data.candidates?.[0]?.content?.parts ?? [];
-    return parts.map((p) => p.text ?? "").join("").trim() || "내용을 읽지 못했어요.";
+    const summary = parts.map((p) => p.text ?? "").join("").trim() || "내용을 읽지 못했어요.";
+    if (data.usageMetadata) {
+      AnalyticsService.track("ai_cost_incurred", {
+        model: "gemini-2.5-flash",
+        input_tokens: data.usageMetadata.promptTokenCount ?? 0,
+        output_tokens: data.usageMetadata.candidatesTokenCount ?? 0,
+      }).catch(() => {});
+    }
+    return summary;
   } catch (e) {
     __DEV__ && console.warn("[Gemini] readPaperWithGemini 실패", e);
     return "인터넷 연결을 확인해 주세요.";
@@ -372,7 +391,17 @@ async function parseIntentL3(
       return { intent: "unknown" };
     }
 
-    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const data = await res.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+    };
+    if (data.usageMetadata) {
+      AnalyticsService.track("ai_cost_incurred", {
+        model: "gemini-2.5-flash",
+        input_tokens: data.usageMetadata.promptTokenCount ?? 0,
+        output_tokens: data.usageMetadata.candidatesTokenCount ?? 0,
+      }).catch(() => {});
+    }
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     const clean = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean) as Record<string, string>;

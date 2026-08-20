@@ -397,6 +397,7 @@ export default function HomeScreen() {
       if (result.status === "opened") {
         await addLog("📱", `${parsed.appName} 켰어요`);
         loadTodayLogs();
+        AnalyticsService.track("action_completed", { intent: "open_app" }).catch(() => {});
         setScreen({ type: "idle" });
       } else if (result.status === "ambiguous") {
         setScreen({ type: "app_candidates", candidates: result.candidates, appFamily: parsed.appName });
@@ -513,10 +514,11 @@ export default function HomeScreen() {
           "즐겨찾기 추가",
           `${top.name} 님을 즐겨찾기에 추가할까요?`,
           [
-            { text: "취소", style: "cancel", onPress: () => setScreen({ type: "idle" }) },
+            { text: "취소", style: "cancel", onPress: () => { AnalyticsService.track("action_cancelled", { intent: "add_to_favorites" }).catch(() => {}); setScreen({ type: "idle" }); } },
             { text: "추가할게요", onPress: async () => {
               await addFavorite({ id: top.id, name: top.name });
               setFavorites(await getFavorites());
+              AnalyticsService.track("action_completed", { intent: "add_to_favorites" }).catch(() => {});
               speak(`${top.name} 님을 즐겨찾기에 추가했어요.`).catch(() => {});
               await addLog("⭐", `${top.name} 즐겨찾기 추가`);
               loadTodayLogs();
@@ -536,6 +538,7 @@ export default function HomeScreen() {
         if (result.status === "dialer_opened") {
           await addLog("📞", `${result.contactName} 님께 긴급 연락`);
           loadTodayLogs();
+          AnalyticsService.track("action_completed", { intent: "emergency_family" }).catch(() => {});
           handleReset();
         } else {
           Alert.alert("연락 실패", `${first.name} 님 번호를 찾을 수 없어요.`);
@@ -636,6 +639,7 @@ export default function HomeScreen() {
     if (result.status === "dialer_opened") {
       await addLog("📞", `${result.contactName} 님께 전화`);
       loadTodayLogs();
+      AnalyticsService.track("action_completed", { intent: "call_contact" }).catch(() => {});
       handleReset();
     } else if (result.status === "duplicate_blocked") {
       Alert.alert("", "이미 전화 화면을 열었어요.");
@@ -654,6 +658,7 @@ export default function HomeScreen() {
     if (result.status === "dialer_opened") {
       await addLog("🏪", `${result.businessName} 전화`);
       loadTodayLogs();
+      AnalyticsService.track("action_completed", { intent: "search_business" }).catch(() => {});
       handleReset();
     } else if (result.status === "duplicate_blocked") {
       Alert.alert("", "이미 전화 화면을 열었어요.");
