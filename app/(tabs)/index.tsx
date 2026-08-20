@@ -1383,27 +1383,57 @@ AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
       {/* B-9: 종이 읽기 결과 */}
       {screen.type === "paper_result" && (
         <ScrollView
-          style={{ flex: 1, backgroundColor: Colors.surface }}
-          contentContainerStyle={{ padding: Spacing.lg, paddingBottom: Spacing.xl * 2 }}
+          style={{ flex: 1, backgroundColor: Colors.background }}
+          contentContainerStyle={{ paddingBottom: Spacing.xl * 3 }}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={s.paperTitle}>📄 읽어드릴게요</Text>
-          <Text style={[s.paperResultText, { textAlign: "left", marginTop: Spacing.md }]}>{screen.text}</Text>
-          <TouchableOpacity
-            style={[s.primaryBtn, Shadow.button, { marginTop: Spacing.xl }]}
-            onPress={() => { speak(screen.text, { maxSentences: 10 }).catch(() => {}); }}
-          >
-            <Text style={s.primaryBtnText}>🔊 다시 읽어주기</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.primary, marginTop: Spacing.sm }]}
-            onPress={handleReadPaper}
-          >
-            <Text style={[s.primaryBtnText, { color: Colors.primary }]}>📷 다시 찍기</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.ghostBtn} onPress={handleReset}>
-            <Text style={s.ghostBtnText}>닫기</Text>
-          </TouchableOpacity>
+          {/* 파란 헤더 */}
+          <View style={{
+            backgroundColor: Colors.primary,
+            paddingHorizontal: Spacing.lg,
+            paddingTop: Spacing.xl,
+            paddingBottom: Spacing.lg,
+          }}>
+            <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: FontSize.caption, fontWeight: "600" as const, marginBottom: 4 }}>
+              AI 며느리가 읽어드렸어요
+            </Text>
+            <Text style={{ color: "#FFFFFF", fontSize: FontSize.heading, fontWeight: "800" as const }}>
+              📄 문서 분석 결과
+            </Text>
+          </View>
+
+          {/* 분석 결과 말풍선 */}
+          <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg }}>
+            <View style={[s.paperCard, { borderTopLeftRadius: 6, padding: Spacing.lg }]}>
+              <Text style={{
+                fontSize: FontSize.heading,
+                color: Colors.textPrimary,
+                lineHeight: FontSize.heading * 1.75,
+                textAlign: "left",
+              }}>
+                {screen.text}
+              </Text>
+            </View>
+          </View>
+
+          {/* 버튼 영역 */}
+          <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, gap: Spacing.sm }}>
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button]}
+              onPress={() => { speak(screen.text, { maxSentences: 20 }).catch(() => {}); }}
+            >
+              <Text style={s.primaryBtnText}>🔊 다시 읽어주기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.background, borderWidth: 1.5, borderColor: Colors.primary }]}
+              onPress={handleReadPaper}
+            >
+              <Text style={[s.primaryBtnText, { color: Colors.primary }]}>📷 다른 문서 찍기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.ghostBtn, { marginTop: Spacing.xs }]} onPress={handleReset}>
+              <Text style={s.ghostBtnText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       )}
 

@@ -284,16 +284,17 @@ export async function readPaperWithGemini(base64: string, mimeType: string = "im
     return "지금 읽기가 어려워요. 잠시 후 다시 시도해 주세요.";
   }
   const PROMPT =
-    "이 사진을 보고 어르신에게 설명해 주세요. 다음 세 가지를 순서대로, 쉬운 말로.\n\n" +
-    "1. 무슨 문서예요? (예: 전기요금 고지서, 처방전, 건강검진 결과, 안내문, 택배 영수증)\n" +
-    "2. 중요한 내용이 뭐예요? (날짜, 금액, 기한, 이름, 병명 등 꼭 알아야 할 것만)\n" +
-    "3. 지금 뭘 해야 해요? (납부하세요 / 병원 가세요 / 약 드세요 / 가족에게 보여주세요 / 무시해도 돼요 등)\n\n" +
-    "글자가 전혀 없는 사진이면 \"글자가 없어요.\"라고만 말해 주세요.\n" +
-    "전문 용어는 쉬운 말로 바꿔 주세요. 군더더기 없이 핵심만.";
+    "이 사진에 있는 문서를 보고 어르신에게 자세히 설명해 주세요.\n\n" +
+    "다음 순서로 설명해 주세요:\n" +
+    "첫째, 이게 무슨 문서인지 한 줄로 알려주세요.\n" +
+    "둘째, 중요한 내용을 알려주세요. 날짜, 금액, 이름, 기한, 수치 등 꼭 알아야 할 것을 빠짐없이.\n" +
+    "셋째, 어르신이 지금 해야 할 일을 알려주세요. 납부, 병원 방문, 가족에게 보여주기, 무시해도 됨 등 구체적으로.\n\n" +
+    "친절하고 따뜻한 말투로, 어르신이 바로 이해할 수 있게 쉬운 말로 써 주세요.\n" +
+    "전문 용어는 쉬운 말로 풀어 주세요.\n" +
+    "글자가 없는 사진이면 '글자가 보이지 않아요'라고만 답해 주세요.";
   try {
     const res = await geminiPost({
       body: {
-        system_instruction: { parts: [{ text: ELDERLY_SYSTEM_PROMPT }] },
         contents: [
           {
             parts: [
@@ -302,9 +303,9 @@ export async function readPaperWithGemini(base64: string, mimeType: string = "im
             ],
           },
         ],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 500 },
+        generationConfig: { temperature: 0.3 },
       },
-      timeoutMs: 30_000,
+      timeoutMs: 40_000,
     });
     if (!res.ok) {
       __DEV__ && console.warn(`[Gemini] readPaperWithGemini HTTP ${res.status}`);
