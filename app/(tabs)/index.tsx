@@ -40,11 +40,6 @@ import * as ImagePicker from "expo-image-picker";
 import { detectSmishing } from "@/features/safety/smishingRules";
 import { startSmsListening, stopSmsListening, addSmsListener } from "@/features/safety/SmsReceiverAdapter";
 import { startCallStateListening, stopCallStateListening, addIncomingCallListener } from "@/features/safety/CallStateAdapter";
-import {
-  isDailyGreetingEnabled,
-  scheduleDailyGreeting,
-  cancelDailyGreeting,
-} from "@/features/retention/DailyGreetingService";
 import { getRecentLogs } from "@/features/recommendation/EventLogService";
 import { isNumberInContacts } from "@/features/safety/ContactNumberChecker";
 import type { SafetySeverity } from "@/features/intent/intentParser";
@@ -152,7 +147,6 @@ export default function HomeScreen() {
   const [contactPickerAll, setContactPickerAll] = useState<ContactCandidate[]>([]);
   const [anomalyEnabled, setAnomalyEnabled] = useState(true);
   const [hasAnomalyPermission, setHasAnomalyPermission] = useState(false);
-  const [dailyGreetingEnabled, setDailyGreetingEnabled] = useState(true);
   const [weeklyStats, setWeeklyStats] = useState<{ callCount: number; topName: string | null } | null>(null);
   const insets = useSafeAreaInsets();
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
@@ -169,8 +163,6 @@ export default function HomeScreen() {
     isAnomalyDetectionEnabled().then(setAnomalyEnabled).catch(() => {});
     hasUsagePermission().then(setHasAnomalyPermission).catch(() => {});
     checkAnomalyOnce();
-    // F4-1: 매일 아침 인사 알림 설정 동기화
-    isDailyGreetingEnabled().then(setDailyGreetingEnabled).catch(() => {});
     // F4-3: 이번 주 통화 통계 로드
     getRecentLogs(7).then((logs) => {
       const calls = logs.filter((e) => e.type === "call" && e.outcome === "success");
@@ -827,25 +819,6 @@ AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
         <View style={s.modalOverlay}>
           <View style={[s.modalCard, Shadow.card]}>
             <Text style={s.modalTitle}>⚙️ 설정</Text>
-
-            {/* F4-1: 매일 아침 인사 알림 토글 */}
-            <View style={s.anomalyToggleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.anomalyToggleLabel}>매일 아침 인사</Text>
-                <Text style={s.anomalyToggleSub}>오전 10시에 "전화하실 분 있으세요?" 알림</Text>
-              </View>
-              <Switch
-                value={dailyGreetingEnabled}
-                onValueChange={async (v) => {
-                  setDailyGreetingEnabled(v);
-                  if (v) { await scheduleDailyGreeting(); }
-                  else   { await cancelDailyGreeting(); }
-                }}
-                trackColor={{ false: Colors.border, true: Colors.primary }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-
             <TouchableOpacity
               style={[s.primaryBtn, Shadow.button, { marginTop: Spacing.md }]}
               onPress={() => { setShowSettings(false); setShowOnboarding(true); }}
@@ -897,24 +870,6 @@ AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
                 <Text style={[s.primaryBtnText, { color: Colors.primary }]}>📱 사용 통계 권한 허용</Text>
               </TouchableOpacity>
             )}
-
-            {/* F4-1: 매일 아침 인사 알림 토글 */}
-            <View style={s.anomalyToggleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.anomalyToggleLabel}>매일 아침 인사</Text>
-                <Text style={s.anomalyToggleSub}>오전 10시에 "전화하실 분 있으세요?" 알림</Text>
-              </View>
-              <Switch
-                value={dailyGreetingEnabled}
-                onValueChange={async (v) => {
-                  setDailyGreetingEnabled(v);
-                  if (v) { await scheduleDailyGreeting(); }
-                  else   { await cancelDailyGreeting(); }
-                }}
-                trackColor={{ false: Colors.border, true: Colors.primary }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
 
             <TouchableOpacity
               style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.danger }]}
