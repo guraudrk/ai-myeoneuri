@@ -145,6 +145,7 @@ export default function HomeScreen() {
   const [searchingMsg, setSearchingMsg]   = useState("찾고 있어요…");
   const [linkData, setLinkData]           = useState<LinkData>({ linked: false });
   const [showSettings, setShowSettings]   = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [rec, setRec]                     = useState<Recommendation | null>(null);
   const [relSearch, setRelSearch] = useState("");
   const [contactPickerSearch, setContactPickerSearch] = useState("");
@@ -811,14 +812,51 @@ AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
         </View>
       </Modal>
 
-      {/* ─── 가족 연결 설정: 미연결 → 풀스크린 온보딩 ─── */}
-      <Modal visible={showSettings && !linkData.linked} animationType="slide">
+      {/* ─── 온보딩 (별도 트리거) ─── */}
+      <Modal visible={showOnboarding} animationType="slide">
         <OnboardingScreen
           onDone={() => {
-            setShowSettings(false);
+            setShowOnboarding(false);
             getLinkData().then(setLinkData).catch(() => {});
           }}
         />
+      </Modal>
+
+      {/* ─── 설정 모달: 미연결 ─── */}
+      <Modal visible={showSettings && !linkData.linked} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={[s.modalCard, Shadow.card]}>
+            <Text style={s.modalTitle}>⚙️ 설정</Text>
+
+            {/* F4-1: 매일 아침 인사 알림 토글 */}
+            <View style={s.anomalyToggleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.anomalyToggleLabel}>매일 아침 인사</Text>
+                <Text style={s.anomalyToggleSub}>오전 10시에 "전화하실 분 있으세요?" 알림</Text>
+              </View>
+              <Switch
+                value={dailyGreetingEnabled}
+                onValueChange={async (v) => {
+                  setDailyGreetingEnabled(v);
+                  if (v) { await scheduleDailyGreeting(); }
+                  else   { await cancelDailyGreeting(); }
+                }}
+                trackColor={{ false: Colors.border, true: Colors.primary }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[s.primaryBtn, Shadow.button, { marginTop: Spacing.md }]}
+              onPress={() => { setShowSettings(false); setShowOnboarding(true); }}
+            >
+              <Text style={s.primaryBtnText}>🔗 SilverLink 연결하기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.ghostBtn} onPress={() => setShowSettings(false)}>
+              <Text style={s.ghostBtnText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* ─── 가족 연결 설정: 연결됨 → 바텀시트 ─── */}
