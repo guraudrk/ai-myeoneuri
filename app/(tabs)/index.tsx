@@ -157,7 +157,6 @@ export default function HomeScreen() {
     loadFavorites();
     loadTodayLogs();
     getLinkData().then(setLinkData).catch(() => {});
-    runDailyGreeting();
     loadRecommendation();
     // B-8: 이상 감지 초기화
     isAnomalyDetectionEnabled().then(setAnomalyEnabled).catch(() => {});
@@ -253,18 +252,6 @@ AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
     } catch { /* 추천 없어도 계속 */ }
   }
 
-  async function runDailyGreeting() {
-    try {
-      const stored = await AsyncStorage.getItem("greeting_date_v1");
-      const today = new Date().toISOString().slice(0, 10);
-      if (stored === today) return;
-      await AsyncStorage.setItem("greeting_date_v1", today);
-      const d = new Date();
-      const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
-      const greeting = `안녕하세요. 오늘은 ${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일이에요.`;
-      setTimeout(() => speak(greeting).catch(() => {}), 1200);
-    } catch { /* 무시 */ }
-  }
 
   // B-8: 조용한 이상 감지 — 앱 시작 시 1회
   async function checkAnomalyOnce() {
