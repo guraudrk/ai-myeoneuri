@@ -13,12 +13,6 @@
   <uses-permission android:name="android.permission.READ_CONTACTS"/>
   <!-- F2-3 통화 중 경보 + 음성 인식 -->
   <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-  <!-- F4 매일 아침 알림 -->
-  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-  <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
-  <uses-permission android:name="android.permission.VIBRATE"/>
-  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
   <!-- 구형 Android 갤러리 접근 (expo-image-picker 호환) -->
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
   <queries>
