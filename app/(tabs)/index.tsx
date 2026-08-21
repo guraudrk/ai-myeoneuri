@@ -47,6 +47,7 @@ import { speak, stop as ttsStop } from "@/features/tts/TtsService";
 import { addLog, getTodayLogs, type LogEntry } from "@/features/conversation-log/ConversationLogService";
 import { saveMapping } from "@/features/contacts/RelationshipMapper";
 import { reportSafetyConcernToSilverLink } from "@/features/safetyLink/safetyAlertBridge";
+import { getEmergencyContact, setEmergencyContact, type EmergencyContact } from "@/features/safetyLink/emergencyContactService";
 import {
   getFavorites,
   addFavorite,
@@ -148,6 +149,10 @@ export default function HomeScreen() {
   const [anomalyEnabled, setAnomalyEnabled] = useState(true);
   const [hasAnomalyPermission, setHasAnomalyPermission] = useState(false);
   const [weeklyStats, setWeeklyStats] = useState<{ callCount: number; topName: string | null } | null>(null);
+  const [emergencyContact, setEmergencyContactState] = useState<EmergencyContact | null>(null);
+  const [editingEmergency, setEditingEmergency] = useState(false);
+  const [eNameInput, setENameInput] = useState("");
+  const [ePhoneInput, setEPhoneInput] = useState("");
   const insets = useSafeAreaInsets();
   const speechAdapter = useMemo(() => createExpoSpeechAdapter(), []);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -160,6 +165,7 @@ export default function HomeScreen() {
     loadRecommendation();
     // B-8: 이상 감지 초기화
     isAnomalyDetectionEnabled().then(setAnomalyEnabled).catch(() => {});
+    getEmergencyContact().then(setEmergencyContactState).catch(() => {});
     hasUsagePermission().then(setHasAnomalyPermission).catch(() => {});
     checkAnomalyOnce();
     // F4-3: 이번 주 통화 통계 로드
@@ -808,11 +814,63 @@ AnalyticsService.track("app_open", { launch_type: "cold", app_version: "1" })
             <Text style={s.modalTitle}>⚙️ 설정</Text>
             <TouchableOpacity
               style={[s.primaryBtn, Shadow.button, { marginTop: Spacing.md }]}
-              onPress={() => { setShowSettings(false); setShowOnboarding(true); }}
+              onPress={() => { setShowSettings(false); setShowOnboarding(true); setEditingEmergency(false); }}
             >
               <Text style={s.primaryBtnText}>🔗 SilverLink 연결하기</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.ghostBtn} onPress={() => setShowSettings(false)}>
+
+            {/* 비상 연락처 */}
+            <View style={{ marginTop: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: Spacing.md }}>
+              <Text style={s.anomalyToggleLabel}>📞 이상 상황 비상 연락처</Text>
+              <Text style={[s.anomalyToggleSub, { marginBottom: Spacing.sm }]}>이상 감지 시 이 번호로 전화 연결을 도와드려요</Text>
+              {editingEmergency ? (
+                <>
+                  <TextInput
+                    style={s.modalInput}
+                    placeholder="이름 (예: 딸, 아들)"
+                    value={eNameInput}
+                    onChangeText={setENameInput}
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                  <TextInput
+                    style={[s.modalInput, { marginTop: 8 }]}
+                    placeholder="전화번호"
+                    value={ePhoneInput}
+                    onChangeText={setEPhoneInput}
+                    keyboardType="phone-pad"
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                  <TouchableOpacity
+                    style={[s.primaryBtn, Shadow.button, { marginTop: 8 }]}
+                    onPress={async () => {
+                      if (!eNameInput.trim() || !ePhoneInput.trim()) return;
+                      const c = { name: eNameInput.trim(), phone: ePhoneInput.trim() };
+                      await setEmergencyContact(c);
+                      setEmergencyContactState(c);
+                      setEditingEmergency(false);
+                    }}
+                  >
+                    <Text style={s.primaryBtnText}>저장</Text>
+                  </TouchableOpacity>
+                </>
+              ) : emergencyContact ? (
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={s.anomalyToggleSub}>{emergencyContact.name} · {emergencyContact.phone}</Text>
+                  <TouchableOpacity onPress={() => { setENameInput(emergencyContact.name); setEPhoneInput(emergencyContact.phone); setEditingEmergency(true); }}>
+                    <Text style={{ color: Colors.primary, fontSize: FontSize.body }}>변경</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[s.primaryBtn, Shadow.button, { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.primary }]}
+                  onPress={() => setEditingEmergency(true)}
+                >
+                  <Text style={[s.primaryBtnText, { color: Colors.primary }]}>비상 연락처 설정하기</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TouchableOpacity style={s.ghostBtn} onPress={() => { setShowSettings(false); setEditingEmergency(false); }}>
               <Text style={s.ghostBtnText}>닫기</Text>
             </TouchableOpacity>
           </View>

@@ -1,5 +1,7 @@
+import { Alert, Linking } from "react-native";
 import { supabase } from "@/features/supabase/supabaseClient";
 import { getLinkData } from "@/features/supabase/linkService";
+import { getEmergencyContact } from "./emergencyContactService";
 import type { SafetyCategory, SafetySeverity } from "@/features/intent/intentParser";
 
 const CATEGORY_META: Record<SafetyCategory, { title: string; description: (utterance: string) => string }> = {
@@ -18,7 +20,20 @@ export async function reportSafetyConcernToSilverLink(
   utterance: string
 ): Promise<void> {
   const link = await getLinkData();
-  if (!link.linked) return;
+  if (!link.linked) {
+    const contact = await getEmergencyContact();
+    if (!contact) return;
+    const meta = CATEGORY_META[category];
+    Alert.alert(
+      `⚠️ ${meta.title}`,
+      `이상 상황이 감지됐어요.\n${contact.name}에게 전화할까요?`,
+      [
+        { text: "괜찮아요", style: "cancel" },
+        { text: `📞 ${contact.name}에게 전화`, onPress: () => Linking.openURL(`tel:${contact.phone}`) },
+      ]
+    );
+    return;
+  }
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
